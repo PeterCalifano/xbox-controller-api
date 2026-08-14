@@ -4,7 +4,6 @@ if(POLICY CMP0144)
   cmake_policy(SET CMP0144 NEW)
 endif()
 set(PROJECT_PYTHON_VERSION 3.12)
-set(MATLAB_DEFAULT_RELEASE "R2023b")
 
 #set(CMAKE_C_COMPILER gcc-11)
 #set(CMAKE_CXX_COMPILER g++-11)
@@ -12,7 +11,7 @@ set(MATLAB_DEFAULT_RELEASE "R2023b")
 # PROJECT DEFINITION
 set(project_name "template_project")
 set(project_description
-    "Reusable C++ library template with optional Python, MATLAB, and ROS 2 support")
+    "Reusable C++ library template with optional Python and ROS 2 support")
 set(project_homepage_url "https://github.com/PeterCalifano/cpp_cuda_template_project")
 set(PROJECT_MAINTAINER_NAME "Pietro Califano" CACHE STRING "Project maintainer name")
 set(PROJECT_MAINTAINER_EMAIL "petercalifano.gs@gmail.com" CACHE STRING "Project maintainer email")
@@ -192,12 +191,7 @@ endif()
 if (NOT DEFINED GTWRAP_BUILD_PYTHON_DEFAULT)
   set(GTWRAP_BUILD_PYTHON_DEFAULT OFF CACHE BOOL "Default Python wrapper setting for all subprojects")
 endif()
-if (NOT DEFINED GTWRAP_BUILD_MATLAB_DEFAULT)
-  set(GTWRAP_BUILD_MATLAB_DEFAULT OFF CACHE BOOL "Default MATLAB wrapper setting for all subprojects")
-endif()
-
 set(GTWRAP_PYTHON_OPTION_NAME "${LIB_NAMESPACE}_BUILD_PYTHON_WRAPPER")
-set(GTWRAP_MATLAB_OPTION_NAME "${LIB_NAMESPACE}_BUILD_MATLAB_WRAPPER")
 set(GTWRAP_INTERFACE_OPTION_NAME "${LIB_NAMESPACE}_WRAPPER_INTERFACE_FILES")
 set(GTWRAP_TOP_NAMESPACE_OPTION_NAME "${LIB_NAMESPACE}_GTWRAP_TOP_NAMESPACE")
 set(GTWRAP_DEPENDENCIES_OPTION_NAME "${LIB_NAMESPACE}_GTWRAP_DEPENDENCY_TARGETS")
@@ -206,7 +200,6 @@ set(GTWRAP_RUNTIME_DEPENDENCIES_OPTION_NAME
 set(GTWRAP_ROOT_OPTION_NAME "${LIB_NAMESPACE}_GTWRAP_ROOT_DIR")
 
 option(${GTWRAP_PYTHON_OPTION_NAME} "Build Python wrapper" ${GTWRAP_BUILD_PYTHON_DEFAULT})
-option(${GTWRAP_MATLAB_OPTION_NAME} "Build MATLAB wrapper" ${GTWRAP_BUILD_MATLAB_DEFAULT})
 
 if (NOT DEFINED ${GTWRAP_INTERFACE_OPTION_NAME})
   set(${GTWRAP_INTERFACE_OPTION_NAME}
@@ -408,12 +401,9 @@ if(BUILD_AS_MAIN_PROJECT)
   handle_gtwrappers() # You may also pass WRAP_INTERFACE_FILES variable to specify interface files, else autofetching is used
 
   # Determine if any wrapper is enabled
-  if(${GTWRAP_PYTHON_OPTION_NAME} OR ${GTWRAP_MATLAB_OPTION_NAME})
+  if(${GTWRAP_PYTHON_OPTION_NAME})
     set(ANY_WRAPPER_ENABLED ON)
   endif()
-
-  include("${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/AddMatlabWrapperRegressionTests.cmake")
-  add_template_matlab_wrapper_regression_tests()
 endif()
 
 ###########################################################################
@@ -462,8 +452,6 @@ print_compiler_flags_summary()
 if (ANY_WRAPPER_ENABLED)
   message(STATUS "================  Wrappers Configuration  ======================")
   message(STATUS "Python gtwrapper                            : ${${GTWRAP_PYTHON_OPTION_NAME}}")
-  message(STATUS "MATLAB gtwrapper                            : ${${GTWRAP_MATLAB_OPTION_NAME}}")
-  message(STATUS "MATLAB default release                      : ${MATLAB_DEFAULT_RELEASE}")
   message(STATUS "Python executable                           : ${PYTHON_EXECUTABLE}")
   message(STATUS "Python version                              : ${PROJECT_PYTHON_VERSION}")
   message(STATUS "gtwrap interface option name                : ${GTWRAP_INTERFACE_OPTION_NAME}")

@@ -27,12 +27,10 @@ ENGINE=""
 FORCE_BUILD="no"
 USE_GPU="yes"
 CUDA_VERSION="12.9"
-MATLAB_ROOT=""
 VSCODE_MODE="no"
 VSCODE_USER="vscode"
 VSCODE_CONTAINER_NAME="${PROJECT_SLUG}-vscode"
 VSCODE_WORKSPACE="/workspaces/${PROJECT_SLUG}"
-MATLAB_LABEL_KEY="dev.${PROJECT_SLUG}.matlab-root"
 
 usage() {
   cat <<EOF
@@ -48,7 +46,6 @@ Options:
   --vscode             Start an attach-ready VS Code container and exit.
   --container-name <n> Container name for --vscode
                        (default: ${VSCODE_CONTAINER_NAME}).
-  --matlab-root <path> Read-only MATLAB installation exposed at the same path.
   --image <name>       Image tag (default: ${IMAGE_TAG}).
   --engine <e>         Container engine: docker or podman (default: autodetect).
   --cuda-version <v>   CUDA toolkit version build argument
@@ -66,7 +63,6 @@ print_vscode_instructions() {
   cat <<EOF
 Container: ${VSCODE_CONTAINER_NAME}
 Workspace: ${VSCODE_WORKSPACE}
-MATLAB root: ${MATLAB_ROOT:-not mounted}
 
 In VS Code:
   1. Run "Dev Containers: Attach to Running Container...".
@@ -99,12 +95,6 @@ while [[ $# -gt 0 ]]; do
       VSCODE_CONTAINER_NAME="${1:-}"
       [[ -n "$VSCODE_CONTAINER_NAME" ]] \
         || { echo "--container-name requires a value."; exit 1; }
-      ;;
-    --matlab-root)
-      shift
-      MATLAB_ROOT="${1:-}"
-      [[ -n "$MATLAB_ROOT" ]] \
-        || { echo "--matlab-root requires a value."; exit 1; }
       ;;
     --image)
       shift
@@ -144,26 +134,6 @@ done
 if [[ "$VSCODE_MODE" == "yes" && $# -gt 0 ]]; then
   echo "--vscode starts an attachment container and does not accept a command."
   exit 1
-fi
-
-# Resolve optional host tools before constructing engine arguments so invalid
-# paths fail without building or starting any container.
-matlab_args_=()
-if [[ -n "$MATLAB_ROOT" ]]; then
-  MATLAB_ROOT="$(readlink -f -- "$MATLAB_ROOT" 2>/dev/null || true)"
-  if [[ -z "$MATLAB_ROOT" || ! -d "$MATLAB_ROOT" ]]; then
-    echo "--matlab-root must identify an existing directory."
-    exit 1
-  fi
-  if [[ ! -f "${MATLAB_ROOT}/extern/include/mex.h" ]]; then
-    echo "--matlab-root does not contain extern/include/mex.h: ${MATLAB_ROOT}"
-    exit 1
-  fi
-
-  matlab_args_=(
-    --mount "type=bind,source=${MATLAB_ROOT},target=${MATLAB_ROOT},readonly"
-    --env "MATLAB_ROOT_DIR=${MATLAB_ROOT}"
-  )
 fi
 
 # Select the engine explicitly before image inspection so all later commands
@@ -219,8 +189,6 @@ if [[ "$USE_GPU" == "yes" ]]; then
 fi
 
 if [[ "$VSCODE_MODE" == "yes" ]]; then
-  # Reuse an existing attachment container only when its immutable MATLAB
-  # mount matches the requested configuration.
   if "$ENGINE" container inspect "$VSCODE_CONTAINER_NAME" \
        >/dev/null 2>&1; then
     container_running_="$(
@@ -228,22 +196,6 @@ if [[ "$VSCODE_MODE" == "yes" ]]; then
         --format '{{.State.Running}}' "$VSCODE_CONTAINER_NAME"
     )"
     if [[ "$container_running_" == "true" ]]; then
-      container_matlab_root_="$(
-        "$ENGINE" container inspect \
-          --format "{{index .Config.Labels \"${MATLAB_LABEL_KEY}\"}}" \
-          "$VSCODE_CONTAINER_NAME" 2>/dev/null || true
-      )"
-      [[ "$container_matlab_root_" == "<no value>" ]] \
-        && container_matlab_root_=""
-      if [[ -n "$MATLAB_ROOT" \
-            && "$MATLAB_ROOT" != "$container_matlab_root_" ]]; then
-        echo "The running container uses a different MATLAB root: " \
-             "${container_matlab_root_:-not mounted}"
-        echo "Stop it before recreating it with ${MATLAB_ROOT}."
-        exit 1
-      fi
-      [[ -n "$container_matlab_root_" ]] \
-        && MATLAB_ROOT="$container_matlab_root_"
       echo "VS Code container is already running."
       print_vscode_instructions
       exit 0
@@ -319,9 +271,7 @@ if [[ "$VSCODE_MODE" == "yes" ]]; then
       "${vscode_engine_args_[@]}" \
       "${gpu_args_[@]}" \
       "${vscode_ssh_args_[@]}" \
-      "${matlab_args_[@]}" \
       --user "$VSCODE_USER" \
-      --label "${MATLAB_LABEL_KEY}=${MATLAB_ROOT}" \
       --mount "type=bind,source=${ROOT_DIR},target=${VSCODE_WORKSPACE}" \
       --workdir "$VSCODE_WORKSPACE" \
       --env DISPLAY="${DISPLAY:-}" \
@@ -363,7 +313,6 @@ exec "$ENGINE" run --rm \
   "${engine_args_[@]}" \
   "${identity_args_[@]}" \
   "${gpu_args_[@]}" \
-  "${matlab_args_[@]}" \
   --mount "type=bind,source=${ROOT_DIR},target=/workspace" \
   --workdir /workspace \
   --env DISPLAY="${DISPLAY:-}" \

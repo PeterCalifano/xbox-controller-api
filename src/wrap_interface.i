@@ -1,5 +1,5 @@
 //*************************************************************************
-// MATLAB/Python wrapper definition file.
+// Python wrapper definition file.
 //*************************************************************************
 
 namespace cpp_playground
