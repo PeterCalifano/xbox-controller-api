@@ -7,11 +7,6 @@ get_filename_component(TEMPLATE_PROJECT_REPOSITORY_ROOT
     ABSOLUTE
 )
 
-option(TEMPLATE_PROJECT_ENABLE_CUDA "Enable CUDA support in the template_project core." OFF)
-option(TEMPLATE_PROJECT_ENABLE_OPTIX "Enable OptiX support in the template_project core." OFF)
-
-set(template_project_ENABLE_CUDA "${TEMPLATE_PROJECT_ENABLE_CUDA}" CACHE BOOL "Enable CUDA support in the template_project core." FORCE)
-set(template_project_ENABLE_OPTIX "${TEMPLATE_PROJECT_ENABLE_OPTIX}" CACHE BOOL "Enable OptiX support in the template_project core." FORCE)
 set(ENABLE_TESTS OFF CACHE BOOL "Disable core template tests in the ROS 2 overlay build." FORCE)
 set(ENABLE_FETCH_CATCH2 OFF CACHE BOOL "Do not fetch Catch2 while building the ROS 2 overlay." FORCE)
 

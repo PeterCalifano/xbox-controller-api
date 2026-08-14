@@ -7,9 +7,6 @@ get_filename_component(TEMPLATE_PROJECT_REPOSITORY_ROOT
   ABSOLUTE
 )
 
-option(TEMPLATE_PROJECT_ENABLE_CUDA "Accepted for workspace-wide build helper compatibility." OFF)
-option(TEMPLATE_PROJECT_ENABLE_OPTIX "Accepted for workspace-wide build helper compatibility." OFF)
-
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
 endif()

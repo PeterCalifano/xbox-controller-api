@@ -14,8 +14,6 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "ENABLE_TESTS": "OFF",
-        "ENABLE_CUDA": "OFF",
-        "ENABLE_OPTIX": "OFF",
         "ENABLE_OPENGL": "OFF",
         "BUILD_DOC_HTML": "ON",
         "BUILD_DOC_XML": "ON",

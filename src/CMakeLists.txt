@@ -20,9 +20,6 @@ add_subdirectory(utils)
 message(STATUS "Adding module: template_src")
 add_subdirectory(template_src)
 
-message(STATUS "Adding module: template_src_kernels")
-add_subdirectory(template_src_kernels)
-
 message(STATUS "Adding module: wrapped_impl")
 add_subdirectory(wrapped_impl)
 if (BUILD_AS_MAIN_PROJECT AND ${${BUILD_PROGRAMS_OPTION_NAME}})
@@ -77,61 +74,9 @@ endif()
 # If need to add other files after add_library, use:
 #target_sources(${lib_name} SHARED ${srcLibFiles})
 
-if ( ENABLE_OPTIX )
-  if (lib_is_header_only)
-    message(FATAL_ERROR
-      "Internal configuration error: ENABLE_OPTIX passed the root preflight, "
-      "but ${lib_name} resolved to a header-only target in src/CMakeLists.txt.")
-  endif()
-
-  if (NOT srcCudaFilesToPTX)
-    message(FATAL_ERROR
-      "Internal configuration error: ENABLE_OPTIX passed the root preflight, "
-      "but no PTX kernel sources reached src/CMakeLists.txt.")
-  endif()
-
-  message("Library .cu kernels files to compile as PTX: ${srcCudaFilesToPTX}")
-
-  # Build CUDA to PTX code and const char
-  get_target_property(project_interface_INCLUDE_DIRS ${project_name}_include INTERFACE_INCLUDE_DIRECTORIES)
-  if (NOT project_interface_INCLUDE_DIRS)
-    set(project_interface_INCLUDE_DIRS "")
-  endif()
-
-  set(PTX_INCLUDE_DIRS ${CUDAToolkit_INCLUDE_DIRS} 
-                      ${OptiX_INCLUDE_DIRS} 
-                      ${project_interface_INCLUDE_DIRS} 
-                      ) # Include directories for PTX compilation
-
-  cuda_compile_and_embed(embedded_ptx_code ${sm_version} "${PTX_INCLUDE_DIRS}" ${srcCudaFilesToPTX})
-  # NOTE: Macro above sets up the build of CUDA kernels -> PTX code from which OptiX module is built.
-  # Build occurs before compilation and linking of the library (or executables).
-  # Variable embedded_ptx_code must be extern "C" const char within the cpp source code.
-    
-  # Add the embedded PTX code to the library
-  target_sources(${lib_name} PRIVATE ${embedded_ptx_code})    
-endif()
-
 ### Link targets
 # Project include directories
 target_link_libraries(${lib_name} ${lib_link_scope} ${project_name}_include ${LIB_COMPILE_TARGET})
-
-# Link interface target for CUDA
-
-if (ENABLE_CUDA)
-  target_link_libraries(${lib_name} ${lib_link_scope} ${CUDA_COMPILE_TARGET})
-endif()
-
-# Link TensorRT through its project-owned interface so build-tree and installed
-# consumers receive the same SDK targets and feature definition.
-if(ENABLE_TENSORRT)
-  target_link_libraries(${lib_name} ${lib_link_scope} ${TENSORRT_COMPILE_TARGET})
-endif()
-
-# Link OptiX interface target
-if(ENABLE_OPTIX)
-  target_link_libraries(${lib_name} ${lib_link_scope} ${OPTIX_COMPILE_TARGET})
-endif()
 
 if (ENABLE_OPENGL)
   target_link_libraries(${lib_name} ${lib_link_scope} ${OPENGL_COMPILE_TARGET})
@@ -168,16 +113,6 @@ if (TARGET ${PROFILING_COMPILE_TARGET})
   list(APPEND installable_targets ${PROFILING_COMPILE_TARGET})
 endif()
                       
-if (ENABLE_CUDA)
-  list(APPEND installable_targets ${CUDA_COMPILE_TARGET})
-endif()
-if(ENABLE_TENSORRT)
-  list(APPEND installable_targets ${TENSORRT_COMPILE_TARGET})
-endif()
-if(ENABLE_OPTIX)
-  list(APPEND installable_targets ${OPTIX_COMPILE_TARGET})
-endif()
-
 if (ENABLE_OPENGL)
   list(APPEND installable_targets ${OPENGL_COMPILE_TARGET})
 endif()
@@ -223,25 +158,10 @@ configure_package_config_file(
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${project_name}
 )
 
-# Stage optional package-owned find modules for build-tree and installed
-# consumers while leaving the base template dependency set unchanged.
-set(_package_module_build_dir "${PROJECT_BINARY_DIR}/modules")
-file(MAKE_DIRECTORY "${_package_module_build_dir}")
-configure_file(
-    "${PROJECT_SOURCE_DIR}/cmake/FindTensorRT.cmake"
-    "${_package_module_build_dir}/FindTensorRT.cmake"
-    COPYONLY
-)
-
 install(FILES
     "${PROJECT_BINARY_DIR}/${project_name}Config.cmake"
     "${PROJECT_BINARY_DIR}/${project_name}ConfigVersion.cmake"
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${project_name}
-)
-
-install(FILES
-    "${PROJECT_SOURCE_DIR}/cmake/FindTensorRT.cmake"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${project_name}/modules
 )
 
 # Add target export to allow usage of build by other consumer projects

@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
 
 #set(CMAKE_C_COMPILER gcc-11)
 #set(CMAKE_CXX_COMPILER g++-11)
-#set(CMAKE_CUDA_COMPILER nvcc)
 
 # PROJECT DEFINITION
 set(project_name "example_consumer_project")
@@ -24,7 +23,7 @@ if(NOT EXISTS "${DEPENDENCY_ROOT_PREFIX}/install/lib/cmake/")
     message(FATAL_ERROR "Please build and install the template_project first.")
 endif()
 
-project(${project_name} VERSION 0.1.0 LANGUAGES CXX CUDA)
+project(${project_name} VERSION 0.1.0 LANGUAGES CXX)
 
 # Tell cmake where to find the template_project
 set(template_project_DIR "${DEPENDENCY_ROOT_PREFIX}/install/lib/cmake/template_project")
