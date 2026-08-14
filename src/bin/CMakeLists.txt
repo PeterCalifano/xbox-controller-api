@@ -1,5 +1,5 @@
 # Add programs to build
-set(EXAMPLES_PATTERN "*.cpp" "*.cu")
+set(EXAMPLES_PATTERN "*.cpp")
 file(GLOB srcProgramsFiles RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${EXAMPLES_PATTERN})
 
 # Exclude EXCLUDED_LIST from the list of examples

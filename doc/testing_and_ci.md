@@ -12,7 +12,7 @@ cmake --build build --parallel 4
 ctest --test-dir build --output-on-failure
 ```
 
-Compiled tests are discovered from `test*.cpp` and `test*.cu` files and run with
+Compiled tests are discovered from `test*.cpp` files and run with
 Catch2. Python tests are discovered from `test*.py` files and registered as
 normal CTest entries that execute `python -m pytest -q <test-file>`.
 
@@ -39,7 +39,7 @@ project's Catch2 policy.
 
 The discovery helper is shared by starter projects and downstream projects:
 
-- `test*.cpp` and `test*.cu`: compiled only when Catch2 is available.
+- `test*.cpp`: compiled only when Catch2 is available.
 - `test*.py`: registered when `ENABLE_TESTS=ON` and `ENABLE_PYTHON_TESTS=ON`.
 - `EXCLUDED_LIST`: accepts either full filenames such as `testSlow.py` or stems
   such as `testSlow`.

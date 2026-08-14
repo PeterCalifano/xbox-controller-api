@@ -70,8 +70,8 @@ ctest --test-dir build --output-on-failure
 ctest --test-dir build --output-on-failure -R <test_name>
 ```
 
-CTest is the single local test entrypoint. Compiled tests named `test*.cpp` or
-`test*.cu` are built as Catch2 executables. Python tests named `test*.py` are
+CTest is the single local test entrypoint. Compiled tests named `test*.cpp`
+are built as Catch2 executables. Python tests named `test*.py` are
 registered as CTest tests and run through `python -m pytest -q`.
 
 Useful local filters:

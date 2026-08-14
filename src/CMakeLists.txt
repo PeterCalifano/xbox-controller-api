@@ -4,10 +4,8 @@ set(lib_name ${LIB_TARGET_NAME}) # Override lets nested consumers avoid target n
 configure_file(config.h.in config.h)
 
 # Add src files to library
-set(SRC_PATTERN "*.cpp" "*.cu")
+set(SRC_PATTERN "*.cpp")
 file(GLOB srcLibFiles RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${SRC_PATTERN})
-file(GLOB srcCudaFilesToPTX "*.ptx.cu")
-list(FILTER srcLibFiles EXCLUDE REGEX "\\.ptx\\.cu$")
 
 # Get current folder name
 get_filename_component(CURRENT_FOLDER_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
