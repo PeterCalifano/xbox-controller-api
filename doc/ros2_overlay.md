@@ -7,7 +7,6 @@ The optional ROS 2 overlay is a colcon workspace layered on top of the C++-first
 ROS integration lives in `ros2/` plus the root overlay helpers:
 
 - `build_ros2.sh`
-- `add_ros2_support.sh`
 - the four root `COLCON_IGNORE` markers
 - `.github/workflows/build_ros2_overlay.yml`
 - this documentation and the ROS package runtime tests
@@ -116,70 +115,27 @@ Run `./generate_version.sh` manually after changing root project metadata or tag
 before packaging source archives. Releases need the tag-safe preparation order
 described in [Release tagging with the ROS 2 overlay](versioning.md#release-tagging-with-the-ros-2-overlay).
 
-## Rollout to derived repositories
+## Adaptation seam
 
-Use `add_ros2_support.sh` from this template checkout when a derived repository does not already contain a ROS overlay:
-
-```bash
-./add_ros2_support.sh --root /path/to/derived_repo --apply --yes --verify
-```
-
-The rollout script is purely additive. It refuses targets that already have `ros2/` or `build_ros2.sh`, copies the overlay files, renames copied ROS package paths and copied file contents from `xbox_controller_api` to a ROS package prefix, and leaves existing target files untouched.
-
-For CI, rollout copies the reusable
-`.github/workflows/build_ros2_overlay.yml` directly into the target. The source
-repository and derived projects therefore execute the same workflow definition.
-
-By default, the ROS package prefix is derived from the target CMake package name in `set(project_name "...")`. If the CMake package name is already ROS-valid, the two names match. If the CMake package name is not ROS-valid, the script keeps core CMake references pointed at the original CMake package name while using a ROS-valid package prefix for ROS package names. For example, a target CMake package named `space-nav-frontend` keeps this core CMake shape:
-
-```cmake
-find_package(space-nav-frontend REQUIRED)
-target_link_libraries(my_target PRIVATE space-nav-frontend::space-nav-frontend)
-```
-
-The copied ROS packages use paths such as `ros2/space_nav_frontend_ros`. Pass `--ros-prefix <name>` when the derived repository needs an explicit ROS package prefix.
-
-`add_ros2_support.sh` owns this one-time package identity mapping. After the
-target adopts the root metadata contract, `./generate_version.sh`
-handles recurring project metadata without renaming that package identity.
-
-After the script runs, complete the EDIT-ME core-call step in the primary adaptation seam:
+The primary adaptation seam is:
 
 ```text
-ros2/<ros_prefix>_ros/src/conversions.cpp
+ros2/xbox_controller_api_ros/src/conversions.cpp
 ```
 
-Update the fenced include and `EvaluateTemplateCore` body to call the derived library API. Review `ros2/<ros_prefix>_ros/src/CXboxControllerLifecycleNode.cpp` only when ROS node wiring, parameters, publishers, or services also need to change. Here, `<ros_prefix>` is the ROS-valid prefix reported by `add_ros2_support.sh`, which may differ from the CMake project name. Then run `./build_ros2.sh --clean`.
-
-Supported orders:
-
-- rename-then-overlay: tailor and rename the C++ project first, then run `add_ros2_support.sh`.
-- overlay-then-rename: add the overlay to a still-template-shaped checkout, then include the `ros2/` package names in the broad rename pass.
-
-The script does not edit README, AGENTS, CLAUDE, or other existing target docs. Link this file from target docs manually when needed.
-
+Update the fenced include and the `EvaluateTemplateCore` body to call the real
+library API. It currently calls the placeholder so the overlay keeps building.
+Review `ros2/xbox_controller_api_ros/src/CXboxControllerLifecycleNode.cpp` only
+when ROS node wiring, parameters, publishers, or services also need to change.
+Then run `./build_ros2.sh --clean`.
 
 ## Removal
 
-The overlay is kept by default during template cleanup. Remove it explicitly:
-
-```bash
-./tailor_template_cleanup.sh --apply --yes --project-namespace my_project --remove-ros2
-```
-
-`--remove-ros2` deletes `ros2/`, `build_ros2.sh`, `add_ros2_support.sh`, the colcon markers, the ROS overlay CI workflow, this file, and the ROS static pytest. It also strips `<!-- ros2-overlay-begin -->` / `<!-- ros2-overlay-end -->` fenced blocks from the template docs. `generate_version.sh` is left in place because its automatic ROS synchronization already no-ops without the supported overlay helper.
-
-For an already-tailored repository that removed
-`tailor_template_cleanup.sh`, perform manual removal: delete `ros2/`,
-`build_ros2.sh`, `add_ros2_support.sh`, the ROS workflow and any remaining
-`.tpl`, this document, and the ROS static pytest. Remove the four
-`COLCON_IGNORE` markers only when the overlay introduced them and the derived
-project does not otherwise need them. Finally, remove the complete
-`<!-- ros2-overlay-begin -->` through `<!-- ros2-overlay-end -->` blocks from
-`README.md`, agent guidance, and `doc/versioning.md`. Reject orphaned, nested, or
-unclosed markers rather than deleting an ambiguous span. Keep
-`generate_version.sh`; its automatic ROS synchronization is already a no-op
-when the supported overlay helper is absent.
+To drop the overlay, delete `ros2/`, `build_ros2.sh`, the ROS overlay CI
+workflow (`.github/workflows/build_ros2_overlay.yml`), this document, and the
+ROS static pytest. Remove the four `COLCON_IGNORE` markers only if nothing else
+needs them. Keep `generate_version.sh`; its ROS synchronization is already a
+no-op when the overlay is absent.
 
 ## CI
 
