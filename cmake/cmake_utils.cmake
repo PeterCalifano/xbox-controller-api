@@ -202,8 +202,8 @@ endfunction()
 # Resolve the catch_discover_tests PROPERTIES argument. The 5th add_tests()
 # argument may be either:
 #   - a defined variable NAME holding the properties (preferred idiom, e.g.
-#     CATCH2_TEST_PROPERTIES, or a caller-defined "OPTIX_TEST_PROPERTIES"), or
-#   - a literal value/list (e.g. "FIXTURES_REQUIRED;Optix").
+#     CATCH2_TEST_PROPERTIES, or a caller-defined "GPU_TEST_PROPERTIES"), or
+#   - a literal value/list (e.g. "FIXTURES_REQUIRED;Hardware").
 # The MATCHES ";" guard must precede the if(DEFINED ...) check: a list literal
 # expands to multiple tokens and would otherwise break if(DEFINED ${var}) at
 # parse time (CMake error: "if given arguments ... Unknown arguments specified").
