@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation workflow checklist
+    url: https://github.com/PeterCalifano/cpp_cuda_template_project/blob/main/doc/documentation_workflow.md
+    about: Read the local docs and Pages workflow before opening documentation or publishing issues.

@@ -1,0 +1,53 @@
+name: Feature request
+description: Propose a scoped improvement to the template, wrappers, docs, CI, or testfield validation.
+title: "[FEATURE] "
+labels:
+  - major-enhancement
+assignees:
+  - PeterCalifano
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or missing capability
+      description: Explain the current limitation and who is affected.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Owning surface
+      options:
+        - C++ library
+        - CUDA or OptiX
+        - Python wrapper
+        - MATLAB wrapper
+        - Versioning or packaging
+        - Documentation or GitHub Pages
+        - CI workflow
+        - Issue templates
+        - Testfield or nested-library validation
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the intended behavior, APIs, files, or workflow stages.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation plan
+      description: List the tests, docs checks, Pages checks, or downstream testfield checks that should prove the change.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Note simpler, narrower, or rejected approaches if relevant.
+    validations:
+      required: false

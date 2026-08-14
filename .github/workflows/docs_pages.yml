@@ -1,0 +1,112 @@
+name: docs_pages
+run-name: Build and publish Doxygen documentation
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_pages:
+        description: "Deploy to GitHub Pages after building docs"
+        required: true
+        default: false
+        type: boolean
+  push:
+    branches:
+      - "master"
+      - "main"
+      - "develop"
+    paths:
+      - README.md
+      - src/**
+      - doc/**
+      - cmake/**
+      - CMakeLists.txt
+      - CMakePresets.json
+      - .github/workflows/docs_pages.yml
+  pull_request:
+    branches:
+      - "master"
+      - "main"
+      - "develop"
+      - "dev*"
+    paths:
+      - README.md
+      - src/**
+      - doc/**
+      - cmake/**
+      - CMakeLists.txt
+      - CMakePresets.json
+      - .github/workflows/docs_pages.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_DIR: build_docs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install documentation dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y cmake ninja-build g++ doxygen graphviz libeigen3-dev
+
+      - name: Configure documentation build
+        run: |
+          cmake -S . -B "${BUILD_DIR}" -GNinja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DENABLE_TESTS=OFF \
+            -DENABLE_CUDA=OFF \
+            -DENABLE_OPTIX=OFF \
+            -DENABLE_OPENGL=OFF \
+            -DBUILD_DOC_HTML=ON \
+            -DBUILD_DOC_XML=ON \
+            -DBUILD_DOC_LATEX=OFF \
+            -DDOC_WARN_AS_ERROR=OFF
+
+      - name: Build documentation
+        run: cmake --build "${BUILD_DIR}" --target doc --parallel 2
+
+      - name: Verify generated site
+        run: |
+          test -f "${BUILD_DIR}/doc/html/index.html"
+          test -d "${BUILD_DIR}/doc/xml"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ env.BUILD_DIR }}/doc/html
+
+  deploy:
+    if: ${{ (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) || (github.event_name == 'workflow_dispatch' && inputs.deploy_pages) }}
+    needs: build-docs
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+      - name: Verify published Pages output
+        run: |
+          curl --fail --location --retry 5 --retry-delay 5 \
+            "${{ steps.deployment.outputs.page_url }}" \
+            --output /tmp/docs-pages-index.html
+          test -s /tmp/docs-pages-index.html

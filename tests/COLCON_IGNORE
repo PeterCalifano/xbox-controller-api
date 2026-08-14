@@ -1,0 +1,1 @@
+# Prevents colcon from crawling test fixtures when the repo sits inside a ROS 2 workspace.

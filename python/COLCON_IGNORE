@@ -1,0 +1,1 @@
+# Prevents colcon from misdetecting this directory (generated setup.py) as a package when the repo sits inside a ROS 2 workspace.

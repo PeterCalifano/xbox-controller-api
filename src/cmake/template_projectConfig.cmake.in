@@ -1,0 +1,95 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Automatically call find_dependency for each dependency
+set(_DEPENDENCIES @EXPORT_TARGET_DEPS@)
+
+foreach(dep ${_DEPENDENCIES})
+  find_dependency(${dep})
+endforeach()
+
+# Resolve the optional installed TensorRT dependency without changing the
+# consumer's module search policy. A QUIET outer lookup reports the package as
+# unavailable; REQUIRED escalation remains the caller's responsibility.
+if(@ENABLE_TENSORRT@)
+  set(_template_project_tensorrt_quietly_was_defined FALSE)
+  if(DEFINED TensorRT_FIND_QUIETLY)
+    set(_template_project_tensorrt_quietly_was_defined TRUE)
+    set(_template_project_saved_tensorrt_quietly "${TensorRT_FIND_QUIETLY}")
+  endif()
+
+  set(TensorRT_FIND_QUIETLY TRUE)
+  set(_template_project_saved_package_name "${CMAKE_FIND_PACKAGE_NAME}")
+  set(CMAKE_FIND_PACKAGE_NAME TensorRT)
+  include("${CMAKE_CURRENT_LIST_DIR}/modules/FindTensorRT.cmake")
+  set(CMAKE_FIND_PACKAGE_NAME "${_template_project_saved_package_name}")
+  unset(_template_project_saved_package_name)
+
+  if(_template_project_tensorrt_quietly_was_defined)
+    set(TensorRT_FIND_QUIETLY "${_template_project_saved_tensorrt_quietly}")
+  else()
+    unset(TensorRT_FIND_QUIETLY)
+  endif()
+  unset(_template_project_saved_tensorrt_quietly)
+  unset(_template_project_tensorrt_quietly_was_defined)
+
+  if(NOT TARGET TensorRT::nvinfer OR NOT TARGET TensorRT::nvinfer_plugin)
+    set(${CMAKE_FIND_PACKAGE_NAME}_FOUND FALSE)
+    set(${CMAKE_FIND_PACKAGE_NAME}_NOT_FOUND_MESSAGE
+        "The installed @PROJECT_NAME@ package was built with TensorRT, but "
+        "the TensorRT SDK was not found. Set TensorRT_ROOT or TENSORRT_ROOT.")
+    return()
+  endif()
+endif()
+
+if(@ENABLE_OPTIX@)
+  set(_template_project_optix_root_hints "")
+  foreach(_optix_root_variable IN ITEMS OPTIX_ROOT OptiX_ROOT OptiX_INSTALL_DIR)
+    if(DEFINED ${_optix_root_variable}
+        AND NOT "${${_optix_root_variable}}" STREQUAL "")
+      list(APPEND _template_project_optix_root_hints
+          "${${_optix_root_variable}}")
+    endif()
+  endforeach()
+  if(DEFINED ENV{OPTIX_HOME} AND NOT "$ENV{OPTIX_HOME}" STREQUAL "")
+    list(APPEND _template_project_optix_root_hints "$ENV{OPTIX_HOME}")
+  endif()
+
+  find_path(
+      _template_project_optix_include_dir
+      NAMES optix.h
+      HINTS ${_template_project_optix_root_hints}
+      PATH_SUFFIXES include)
+  if(NOT _template_project_optix_include_dir)
+    set(${CMAKE_FIND_PACKAGE_NAME}_FOUND FALSE)
+    set(${CMAKE_FIND_PACKAGE_NAME}_NOT_FOUND_MESSAGE
+        "The installed @PROJECT_NAME@ package was built with OptiX, but optix.h "
+        "was not found. Set OPTIX_ROOT, OptiX_ROOT, OptiX_INSTALL_DIR, or "
+        "OPTIX_HOME to an OptiX SDK root.")
+    return()
+  endif()
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Target.cmake")
+
+if(@ENABLE_OPTIX@)
+  set(_template_project_optix_target
+      "@PROJECT_NAME@::@OPTIX_COMPILE_TARGET@")
+  if(NOT TARGET "${_template_project_optix_target}")
+    set(${CMAKE_FIND_PACKAGE_NAME}_FOUND FALSE)
+    set(${CMAKE_FIND_PACKAGE_NAME}_NOT_FOUND_MESSAGE
+        "The installed @PROJECT_NAME@ package is missing its OptiX interface target.")
+    return()
+  endif()
+  set_property(
+      TARGET "${_template_project_optix_target}"
+      APPEND PROPERTY
+      INTERFACE_INCLUDE_DIRECTORIES "${_template_project_optix_include_dir}")
+
+  unset(_template_project_optix_include_dir CACHE)
+  unset(_template_project_optix_include_dir)
+  unset(_template_project_optix_root_hints)
+  unset(_template_project_optix_target)
+  unset(_optix_root_variable)
+endif()

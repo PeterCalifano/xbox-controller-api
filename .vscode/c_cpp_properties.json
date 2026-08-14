@@ -1,0 +1,51 @@
+{
+  "configurations": [
+    {
+      "name": "Linux_ARM64",
+      "includePath": [
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/examples",
+        "${workspaceFolder}/tests",
+        "${workspaceFolder}/build/src",
+        "${workspaceFolder}/build/no_optimization/src"
+      ],
+      "defines": [],
+      "compilerPath": "/usr/bin/gcc",
+      "intelliSenseMode": "linux-gcc-arm64",
+      "browse": {
+        "path": [
+          "${workspaceFolder}/src",
+          "${workspaceFolder}/examples",
+          "${workspaceFolder}/tests",
+          "${workspaceFolder}/build/src",
+          "${workspaceFolder}/build/no_optimization/src"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    },
+    {
+      "name": "Linux_AMD64",
+      "includePath": [
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/examples",
+        "${workspaceFolder}/tests",
+        "${workspaceFolder}/build/src",
+        "${workspaceFolder}/build/no_optimization/src"
+      ],
+      "defines": [],
+      "compilerPath": "/usr/bin/gcc",
+      "intelliSenseMode": "linux-gcc-x64",
+      "browse": {
+        "path": [
+          "${workspaceFolder}/src",
+          "${workspaceFolder}/examples",
+          "${workspaceFolder}/tests",
+          "${workspaceFolder}/build/src",
+          "${workspaceFolder}/build/no_optimization/src"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    }
+  ],
+  "version": 4
+}
