@@ -7,8 +7,6 @@ The documentation workflow is Doxygen-first and CMake-driven. It is intentionall
 ```bash
 cmake -S . -B build_docs \
   -D ENABLE_TESTS=OFF \
-  -D ENABLE_CUDA=OFF \
-  -D ENABLE_OPTIX=OFF \
   -D BUILD_DOC_HTML=ON \
   -D BUILD_DOC_XML=ON
 cmake --build build_docs --target doc
@@ -66,9 +64,7 @@ The generated Doxyfile excludes `lib/`, `doc/developments/`, build directories, 
 ## GitHub Pages
 
 `.github/workflows/docs_pages.yml` builds the Doxygen HTML site and uploads
-`build_docs/doc/html` as a Pages artifact. The same workflow is inherited by a
-tailored project; generic workflow structure and template documentation
-conformance are tested externally by `cpp_cuda_template_testfield`.
+`build_docs/doc/html` as a Pages artifact.
 
 Pull requests build and upload the artifact for inspection but do not deploy. Manual `workflow_dispatch` runs are build-only by default; set `deploy_pages=true` to publish intentionally. Default-branch pushes deploy to the `github-pages` environment.
 

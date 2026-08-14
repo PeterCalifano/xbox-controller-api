@@ -19,14 +19,12 @@ body:
       label: Owning surface
       options:
         - C++ library
-        - CUDA or OptiX
         - Python wrapper
-        - MATLAB wrapper
+        - ROS 2 overlay
         - Versioning or packaging
         - Documentation or GitHub Pages
         - CI workflow
         - Issue templates
-        - Testfield or nested-library validation
     validations:
       required: true
   - type: textarea

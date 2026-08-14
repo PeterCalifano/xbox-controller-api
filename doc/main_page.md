@@ -1,29 +1,34 @@
-# cpp_cuda_xbox_controller_api {#mainpage}
+# xbox_controller_api {#mainpage}
+
+A C++ library for reading Xbox controller input, with optional Python bindings
+and ROS 2 integration.
+
+@note The controller API itself is not implemented yet. The library currently
+exposes placeholder types (`placeholder.h`, `CWrapperPlaceholder`) that mark
+where the real implementation goes. The build, packaging, wrapper,
+documentation, and CI machinery around them is complete.
 
 See the [README](README.md) for the quick start, then use the focused guides below:
 
-- [Template usage](template_usage.md)
-- [Agent tailoring prompt](bootstrap_prompts.md)
-- [C++ and CUDA build guide](cpp_cuda_build.md)
-- [Python and MATLAB wrappers](wrappers.md)
+- [C++ build guide](cpp_build.md)
+- [Python wrappers](wrappers.md)
 - [Versioning](versioning.md)
 - [Dependency-free logging](logging.md)
 - [Documentation workflow](documentation_workflow.md)
 - [Testing, CI, and issue workflow](testing_and_ci.md)
+- [Optional ROS 2 overlay](ros2_overlay.md)
 
 ## Installation
 
 ```bash
-git clone <repo-url> my_project && cd my_project
+git clone https://github.com/PeterCalifano/xbox-controller-api.git
+cd xbox-controller-api
 ./build_lib.sh -t release -i      # build + install to ./install
 ```
 
 ## Common Build Toggles
 
 ```bash
-# Enable CUDA + NVCC optimization toggles
-./build_lib.sh -D ENABLE_CUDA=ON -D CUDA_ENABLE_FMAD=ON -D CUDA_ENABLE_EXTRA_DEVICE_VECTORIZATION=ON
-
 # Enable oneTBB and explicit SIMD/FMA
 ./build_lib.sh -D ENABLE_TBB=ON -D CPU_ENABLE_SIMD=ON -D CPU_SIMD_LEVEL=avx2 -D CPU_ENABLE_FMA=ON
 
@@ -37,14 +42,11 @@ git clone <repo-url> my_project && cd my_project
 # Python wrapper
 ./build_lib.sh -p
 
-# Python + MATLAB wrappers
-./build_lib.sh -p -m
-
 # Use a local wrap checkout instead of installed gtwrap
 ./build_lib.sh -p --gtwrap-root /path/to/wrap
 ```
 
-Install Python package manually from the source Python package:
+Install the Python package manually from the source Python package:
 
 ```bash
 cd python
@@ -54,18 +56,23 @@ python -m pip install .
 ## Example usage (assuming installation worked)
 
 ```cmake
-set(my_project_DIR "/path/to/install/lib/cmake/my_project")
-find_package(my_project REQUIRED)
-target_link_libraries(my_target PRIVATE my_project::my_project)
+set(xbox_controller_api_DIR "/path/to/install/lib/cmake/xbox_controller_api")
+find_package(xbox_controller_api REQUIRED)
+target_link_libraries(my_target PRIVATE xbox_controller_api::xbox_controller_api)
 ```
 
-See `examples/template_consumer_project/` for a complete downstream CMake project.
+See `examples/consumer_project/` for a complete downstream CMake project.
 
-## Adapting to a new project
+## Optional ROS 2 Overlay
 
-Replace all occurrences of `xbox_controller_api` with your project name, rename
-`src/xbox_controller_api/` and `src/xbox_controller_api_kernels/`, and update
-`set(project_name ...)` in the root `CMakeLists.txt`.
+The standalone C++ library builds with `./build_lib.sh` and never requires ROS.
+The optional overlay in `ros2/` builds separately:
 
-Full details are in `doc/template_usage.md`. Agents should use
-`doc/bootstrap_prompts.md` for an interactive tailoring session.
+```bash
+./build_ros2.sh --clean
+```
+
+The core-call seam lives in `ros2/xbox_controller_api_ros/src/conversions.cpp`,
+marked with `EDIT ME` comments. It currently calls the placeholder so the
+overlay keeps building; swap it for the real entry point when the library gains
+one.

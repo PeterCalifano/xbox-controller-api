@@ -3,10 +3,10 @@
 <package format="3">
   <name>xbox_controller_api</name>
   <version>2.0.0</version>
-  <description>Reusable C++/CUDA library template with optional CUDA, OptiX, Python, MATLAB, and ROS 2 support: ROS 2 colcon shim package.</description>
+  <description>C++ library for reading Xbox controller input: ROS 2 colcon shim package.</description>
   <maintainer email="petercalifano.gs@gmail.com">Pietro Califano</maintainer>
   <license>MIT</license>
-  <url type="website">https://github.com/PeterCalifano/cpp_cuda_xbox_controller_api</url>
+  <url type="website">https://github.com/PeterCalifano/xbox-controller-api</url>
 
   <buildtool_depend>cmake</buildtool_depend>
   <depend>eigen</depend>

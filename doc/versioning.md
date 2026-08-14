@@ -38,7 +38,7 @@ also synchronizes `ros2/*/package.xml` metadata. Pass `--no-sync-ros2` to update
 only `VERSION`; `--sync-ros2` remains available when automation needs to request
 the synchronization explicitly.
 
-Keeping source writes opt-in prevents CI and testfield configure runs from dirtying the checkout.
+Keeping source writes opt-in prevents CI configure runs from dirtying the checkout.
 
 Binary packages install the generated build-tree `VERSION`. Canonical source
 packages instead include the source-tree `VERSION` prepared by
@@ -149,7 +149,7 @@ release contract. Uploading the CPack TGZ to a GitHub release remains a
 deliberate manual step; CI upload automation is not yet part of the release
 workflow.
 
-Pushes of `v*.*.*` tags run the native CPU, CUDA, and ROS workflows. The ROS
+Pushes of `v*.*.*` tags run the native CPU and ROS workflows. The ROS
 workflow regenerates metadata, derives the expected strict core version from
 `VERSION`, and requires `git diff --exit-code -- ros2/*/package.xml` to remain
 clean. Branch path filters remain in place, but GitHub does not evaluate them

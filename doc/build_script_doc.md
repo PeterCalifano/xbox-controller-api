@@ -100,7 +100,7 @@ conda environment around the whole script:
 ```
 
 The conda flags only affect registered `test*.py` CTest entries. Compiled C++
-and CUDA tests still run as native executables from the build tree.
+and compiled tests still run as native executables from the build tree.
 
 ## Install
 
@@ -133,48 +133,11 @@ CPU optimization is controlled through CMake definitions:
 ./build_lib.sh -D CPU_ENABLE_SIMD=ON -D CPU_SIMD_LEVEL=avx2 -D CPU_ENABLE_FMA=ON
 ```
 
-## CUDA, OptiX, And TensorRT
-
-CUDA, OptiX, and TensorRT are opt-in:
-
-```bash
-./build_lib.sh -D ENABLE_CUDA=ON
-./build_lib.sh -D ENABLE_CUDA=ON -D ENABLE_OPTIX=ON
-./build_lib.sh -D ENABLE_TENSORRT=ON -D TensorRT_ROOT=/opt/TensorRT
-```
-
-CUDA architecture selection order:
-
-1. `CUDA_ARCHITECTURES`
-2. `CMAKE_CUDA_ARCHITECTURES`
-3. `nvidia-smi` on x86_64/amd64
-4. Jetson/Tegra markers on aarch64/arm64
-
-If detection is unavailable or ambiguous, set `CUDA_ARCHITECTURES` explicitly.
-
-CUDA optimization options:
-
-| CMake option | Purpose |
-|---|---|
-| `CUDA_ENABLE_FMAD` | Control NVCC fused multiply-add contraction. |
-| `CUDA_ENABLE_EXTRA_DEVICE_VECTORIZATION` | Add `--extra-device-vectorization`. |
-| `CUDA_USE_FAST_MATH` | Add `--use_fast_math` to regular CUDA compilation. |
-| `CUDA_PTX_USE_FAST_MATH` | Add `--use_fast_math` to PTX generation. |
-| `CUDA_NVCC_EXTRA_FLAGS` | Extra NVCC flags for CUDA and PTX compilation. |
-
-OptiX builds require at least one compiled library source and at least one `*.ptx.cu` source under `src/`. Header-only OptiX configurations fail during configure because there is no compiled library artifact to own the generated PTX integration.
-
-TensorRT enables CUDA automatically. `TensorRT_ROOT` and `TENSORRT_ROOT` accept
-conventional SDK roots and NVIDIA `targets/<triplet>` archive layouts. The
-installed package retains this external SDK dependency without changing a
-consumer's `CMAKE_MODULE_PATH`.
-
-## Python And MATLAB Wrappers
+## Python Wrappers
 
 | Option | Purpose |
 |---|---|
 | `-p, --python-wrap` | Enable Python wrapper generation. |
-| `-m, --matlab-wrap` | Enable MATLAB wrapper generation. |
 | `--gtwrap-root <dir>` | Use a specific local gtwrap checkout. |
 | `--wrap-update` | Explicitly update a resolved local gtwrap checkout. |
 | `--no-wrap-update` | Keep the resolved local checkout unchanged (default). |
@@ -219,5 +182,4 @@ After tailoring, replace `xbox_controller_api` with the project namespace used b
 - Use `--clean` after changing CMake options or wrapper settings.
 - Use `--wrap-update` only when intentionally advancing a local gtwrap checkout.
 - Set `CPU_ENABLE_NATIVE_TUNING=OFF` for portable binaries.
-- Set `CUDA_ARCHITECTURES` explicitly on CI runners without reliable GPU discovery.
 - For Python tests in conda, prefer `--python-test-conda-env` or `--python-test-conda-prefix` instead of activating conda around the whole CTest run.

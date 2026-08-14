@@ -1,4 +1,4 @@
-# Python and MATLAB Wrapper Guide
+# Python Wrapper Guide
 
 Wrappers are generated from gtwrap interface files. The default top-level interface is `src/wrap_interface.i`; implementation classes intended for binding live under `src/wrapped_impl/`.
 
@@ -9,14 +9,13 @@ Wrapper options are namespaced by `LIB_NAMESPACE`, which prevents nested templat
 | Option | Purpose |
 |---|---|
 | `<namespace>_BUILD_PYTHON_WRAPPER` | Build the pybind11 wrapper |
-| `<namespace>_BUILD_MATLAB_WRAPPER` | Build the MATLAB MEX wrapper |
 | `<namespace>_WRAPPER_INTERFACE_FILES` | Ordered list of `.i` files; first is the top module |
-| `<namespace>_GTWRAP_TOP_NAMESPACE` | C++ namespace exposed at the Python/MATLAB module root |
+| `<namespace>_GTWRAP_TOP_NAMESPACE` | C++ namespace exposed at the Python module root |
 | `<namespace>_GTWRAP_DEPENDENCY_TARGETS` | Additional build-order dependencies required before wrapper generation |
 | `<namespace>_GTWRAP_RUNTIME_DEPENDENCY_TARGETS` | Direct project-owned shared runtime build targets packaged beside the Python wrapper |
 | `<namespace>_GTWRAP_ROOT_DIR` | Local `wrap` checkout override |
 
-`build_lib.sh -p` and `build_lib.sh -m` set the Python and MATLAB wrapper options for the main project.
+`build_lib.sh -p` sets the Python wrapper option for the main project.
 
 ## gtwrap Resolution
 
@@ -83,19 +82,8 @@ enabled; an absolute value is rejected rather than allowing CMake installation
 to escape a user-selected prefix.
 
 Production responsibilities are separated across `HandleWrapper.cmake`
-(gtwrap discovery and orchestration), `HandlePythonWrapper.cmake`,
-`HandleMatlabWrapper.cmake`, and `StagePythonRuntimeArtifacts.cmake`. All four
-modules are retained by project tailoring.
-
-## MATLAB Wrapper
-
-The MATLAB wrapper needs a MATLAB installation visible to CMake. Use the same local `wrap` checkout as Python when validating both wrapper types.
-
-```bash
-./build_lib.sh -m --gtwrap-root /path/to/wrap
-```
-
-MATLAB wrapper tests should include construction, method dispatch, caught error recovery, and teardown through `clear classes` and `clear mex`.
+(gtwrap discovery and orchestration), `HandlePythonWrapper.cmake`, and
+`StagePythonRuntimeArtifacts.cmake`.
 
 ## Docstrings
 

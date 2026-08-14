@@ -34,7 +34,7 @@ The overlay packages are:
 
 The `xbox_controller_api_ros` package keeps a conversions-vs-node split. `xbox_controller_api_ros_conversions` links the core library and interfaces but does not depend on `rclcpp`; it is safe to test without a ROS executor. `xbox_controller_api_ros_component` owns lifecycle, parameters, publishers, services, and component registration.
 
-Core C++ and CUDA unit tests remain Catch2-based. ROS package tests use
+Core C++ unit tests remain Catch2-based. ROS package tests use
 `ament_cmake_gtest` as the narrow ROS-specific exception so ament registers and
 reports them through colcon.
 
@@ -58,53 +58,6 @@ The supplied standalone and composition launch files autostart the lifecycle nod
 
 Jazzy's current `ComposableLifecycleNode` implementation resolves the loaded component's fully qualified name inconsistently during autostart. The composition launch file supplies that identity to the lifecycle event manager locally; remove the compatibility adapter after the upstream `launch_ros` fix is available in the supported ROS distro.
 
-CUDA and OptiX flow through a workspace option facade:
-
-| User flag | Colcon CMake argument | Shim mapping | Core CMake option |
-|---|---|---|---|
-| `--cuda` | `-DXBOX_CONTROLLER_API_ENABLE_CUDA=ON` | cache-forces `xbox_controller_api_ENABLE_CUDA` | `xbox_controller_api_ENABLE_CUDA=ON` |
-| `--optix` | `-DXBOX_CONTROLLER_API_ENABLE_OPTIX=ON` and CUDA ON | cache-forces `xbox_controller_api_ENABLE_OPTIX` | `xbox_controller_api_ENABLE_OPTIX=ON` |
-
-`XBOX_CONTROLLER_API_ENABLE_CUDA` and `XBOX_CONTROLLER_API_ENABLE_OPTIX` are stable
-overlay facade names. They intentionally survive CMake project and ROS package
-renaming so build automation has one consistent interface across derived
-repositories. The shim cache-forces the core options from these facade values,
-so direct `--cmake-arg -Dxbox_controller_api_ENABLE_CUDA=ON` or
-`--cmake-arg -Dxbox_controller_api_ENABLE_OPTIX=ON` values are overwritten by the
-shim. Use
-`--cuda`, `--optix`, or set the corresponding facade variables instead.
-
-Use a ROS 2 Jazzy environment or the ROS devcontainer for local GPU checks:
-
-```bash
-./build_ros2.sh --cuda
-./build_ros2.sh --cuda --optix
-```
-
-For OptiX, provide an SDK root containing `include/optix.h` through a CMake
-variable or the environment. The same contract applies when another package
-consumes a core install that was built with OptiX:
-
-```bash
-export OPTIX_HOME="<optix-sdk-root>"
-./build_ros2.sh --clean --cuda --optix
-```
-
-`OPTIX_ROOT`, `OptiX_ROOT`, and `OptiX_INSTALL_DIR` are equivalent CMake-side
-inputs. The installed package resolves the external SDK at consumer configure
-time; it does not embed the build machine's SDK path or install a private copy
-of the OptiX headers.
-
-**Last local GPU validation (2026-07-17):** ROS 2 Jazzy, CMake 3.28.3, GCC
-13.3.0, CUDA 12.9.41, NVIDIA driver 580.105.08, and OptiX 8.0.0. The host had
-an RTX 5090 (`sm_120`) and an RTX 4070 Ti SUPER (`sm_89`); the default
-single-architecture policy selected `sm_120`. Clean CUDA and CUDA+OptiX overlay
-builds each completed all four packages and reported 10 tests with zero errors
-or failures. The CUDA build compiled the project
-`src/xbox_controller_api_kernels/placeholder.cu`; the OptiX build also generated and
-embedded `placeholder_to_ptx.ptx`. GitHub ROS CI remains CPU-only, so these GPU
-paths are local validation gates.
-
 ## COLCON_IGNORE policy
 
 `COLCON_IGNORE` markers keep colcon from crawling template support trees that are not ROS packages:
@@ -113,7 +66,7 @@ paths are local validation gates.
 - `lib/COLCON_IGNORE`: protects vendored submodules if they contain manifests.
 - `examples/COLCON_IGNORE` and `tests/COLCON_IGNORE`: avoid accidental package discovery in starter project code.
 
-There are no markers in `doc/`, `matlab/`, or `profiling/`. Runtime-generated top-level directories such as `build*`, `install`, and `xbox_controller_api_subbuild` are handled best-effort by `build_ros2.sh` when they exist. This matters when the repository is placed inside a parent workspace: without the markers, a parent colcon crawl can discover unrelated template internals.
+There are no markers in `doc/`. Runtime-generated top-level directories such as `build*`, `install`, and `xbox_controller_api_subbuild` are handled best-effort by `build_ros2.sh` when they exist. This matters when the repository is placed inside a parent workspace: without the markers, a parent colcon crawl can discover unrelated template internals.
 
 ## Project metadata sync
 
@@ -176,8 +129,6 @@ The rollout script is purely additive. It refuses targets that already have `ros
 For CI, rollout copies the reusable
 `.github/workflows/build_ros2_overlay.yml` directly into the target. The source
 repository and derived projects therefore execute the same workflow definition.
-Broader rollout and static-overlay conformance remains in the external
-`cpp_cuda_template_testfield` harness.
 
 By default, the ROS package prefix is derived from the target CMake package name in `set(project_name "...")`. If the CMake package name is already ROS-valid, the two names match. If the CMake package name is not ROS-valid, the script keeps core CMake references pointed at the original CMake package name while using a ROS-valid package prefix for ROS package names. For example, a target CMake package named `space-nav-frontend` keeps this core CMake shape:
 
@@ -207,7 +158,6 @@ Supported orders:
 
 The script does not edit README, AGENTS, CLAUDE, or other existing target docs. Link this file from target docs manually when needed.
 
-Derived repositories that intentionally removed optional template features need one manual tailoring pass after the copy. If CUDA or OptiX support is not present in the target, update the copied `build_ros2.sh` facade, shim CMake options, docs, and CI workflow so unsupported options are not advertised.
 
 ## Removal
 
@@ -226,8 +176,7 @@ For an already-tailored repository that removed
 `COLCON_IGNORE` markers only when the overlay introduced them and the derived
 project does not otherwise need them. Finally, remove the complete
 `<!-- ros2-overlay-begin -->` through `<!-- ros2-overlay-end -->` blocks from
-`README.md`, agent guidance, `doc/bootstrap_prompts.md`,
-`doc/template_usage.md`, and `doc/versioning.md`. Reject orphaned, nested, or
+`README.md`, agent guidance, and `doc/versioning.md`. Reject orphaned, nested, or
 unclosed markers rather than deleting an ambiguous span. Keep
 `generate_version.sh`; its automatic ROS synchronization is already a no-op
 when the supported overlay helper is absent.
@@ -249,10 +198,6 @@ The workflow watches the project source and overlay paths and runs for
 existing manifests when an older derived project lacks the full metadata
 marker; when synchronization is supported, manifest drift is a hard failure.
 
-TestField separately owns static manifest checks, additive rollout fixtures,
-identifier-boundary renaming, and default/ROS-removed tailoring conformance.
-
-CUDA+ROS is local-only in this repository. The available self-hosted GPU runner does not provide the ROS environment, so CI intentionally avoids `build_ros2.sh --cuda`.
 
 ## Python boundary
 

@@ -1,41 +1,24 @@
-# cpp_cuda_xbox_controller_api
+# xbox_controller_api
 
-A CMake template for building GPU-accelerated C++ libraries with optional CUDA,
-OptiX, TensorRT, Python/MATLAB bindings, and profiling support. Shared builds
-are the default, and static builds are selectable through standard CMake
-`BUILD_SHARED_LIBS`. Designed to be cloned and renamed into a real project.
+A C++ library for reading Xbox controller input, with optional Python bindings
+and ROS 2 integration. Shared builds are the default; static builds are
+selectable through the standard CMake `BUILD_SHARED_LIBS`.
+
+> **Status:** the build, packaging, wrapper, documentation, and CI machinery is
+> in place, but the controller API itself is not implemented yet. The library
+> currently exposes placeholder types (`placeholder.h`, `CWrapperPlaceholder`)
+> that mark where the real implementation goes.
 
 ## Documentation Map
 
-- [`doc/template_usage.md`](doc/template_usage.md): cloning, renaming, source layout, nested consumers, and test placement.
-- [`doc/bootstrap_prompts.md`](doc/bootstrap_prompts.md): interactive agent prompt for tailoring the template into a fresh library.
-- [`doc/cpp_cuda_build.md`](doc/cpp_cuda_build.md): C++ build modes, CUDA,
-  OptiX, TensorRT, toolchains, CPU tuning, and profiling toggles.
-- [`doc/wrappers.md`](doc/wrappers.md): gtwrap setup, Python package workflow, MATLAB wrappers, and wrapper docstrings.
+- [`doc/cpp_build.md`](doc/cpp_build.md): C++ build modes, toolchains, and CPU tuning.
+- [`doc/wrappers.md`](doc/wrappers.md): gtwrap setup, Python package workflow, and wrapper docstrings.
 - [`doc/versioning.md`](doc/versioning.md): git tags, source/build/install `VERSION` files, C++ config macros, Python metadata, and packages.
 - [`doc/logging.md`](doc/logging.md): dependency-free component logging, level configuration, stream routing, and capture.
 - [`doc/documentation_workflow.md`](doc/documentation_workflow.md): Doxygen, CMake docs targets, XML output, GitHub Pages, and output checks.
 - [`doc/testing_and_ci.md`](doc/testing_and_ci.md): CTest gates, CI workflow expectations, issue forms, and validation reports.
+- [`doc/ros2_overlay.md`](doc/ros2_overlay.md): optional ROS 2 overlay architecture, build flow, and CI.
 
-Tailoring helper:
-
-```bash
-./tailor_template_cleanup.sh --list
-./tailor_template_cleanup.sh --apply --yes --project-namespace my_project
-```
-
-The required namespace option replaces `xbox_controller_api::logging` in the
-reusable logger sources and examples. Run the cleanup before a broad
-`xbox_controller_api` replacement, because the script contains template-specific
-cleanup paths. Root/test CMake files, starter tests, and project workflows
-remain unchanged. After cleanup succeeds, delete `tailor_template_cleanup.sh`
-or exclude it from the rename pass. `profiling/` is removed by default. Add
-`--keep-profiling` when the new project should keep the Valgrind/perf helper
-scripts. TensorRT discovery and integration remain available to tailored
-projects but stay dependency-neutral while `xbox_controller_api_ENABLE_TENSORRT`
-is `OFF`.
-
-<!-- ros2-overlay-begin -->
 ## Optional ROS 2 Overlay
 
 See [`doc/ros2_overlay.md`](doc/ros2_overlay.md) for the optional ROS 2 overlay architecture, build flow, CI, rollout, and removal policy.
@@ -43,8 +26,6 @@ See [`doc/ros2_overlay.md`](doc/ros2_overlay.md) for the optional ROS 2 overlay 
 - `./build_lib.sh`: C++-first library entry point; it never needs ROS.
 - `./build_ros2.sh`: optional ROS 2 overlay build and test entry point.
 
-Use `./tailor_template_cleanup.sh --apply --yes --project-namespace my_project --remove-ros2` when a derived project should not carry the overlay.
-<!-- ros2-overlay-end -->
 
 ## Requirements
 
@@ -53,14 +34,10 @@ Use `./tailor_template_cleanup.sh --apply --yes --project-namespace my_project -
 | CMake | ≥ 3.15 | |
 | C++ compiler | C++20 | GCC 11+, Clang 13+ |
 | Eigen3 | ≥ 3.4 | Required |
-| CUDA Toolkit | ≥ 12.0 | Optional (`-DENABLE_CUDA=ON`) |
-| OptiX SDK | any | Optional (`-DENABLE_OPTIX=ON`), requires CUDA |
-| TensorRT SDK | any | Optional (`-DENABLE_TENSORRT=ON`), requires CUDA |
 | oneTBB | any | Optional (`-DENABLE_TBB=ON`) |
 | Catch2 | 3.x | Auto-fetched from GitHub if not found |
 | pytest | any | Required when `ENABLE_PYTHON_TESTS=ON` and `test*.py` files are present |
-| pyparsing | latest | Required for gtwrap Python/MATLAB code generation |
-| Valgrind / perf | any | Optional, for profiling scripts |
+| pyparsing | latest | Required for gtwrap Python code generation |
 | libgoogle-perftools-dev | any | Optional (`-DENABLE_PROFILING=ON` / `-DENABLE_TCMALLOC=ON`) |
 
 ---
@@ -127,41 +104,6 @@ directly for filters or arguments that need shell quoting.
 
 ---
 
-## Using as a Template
-
-For a fresh library, first run the tailoring cleanup helper above, then perform the rename pass.
-
-To start a new project from this template, rename the following (all in one pass with your editor's global find-and-replace):
-
-| Placeholder | Replace with |
-|---|---|
-| `xbox_controller_api` | your project name (snake_case) |
-| `xbox_controller_api` | your library module name |
-| `xbox_controller_api_kernels` | your CUDA module name (or delete if no CUDA) |
-
-**Files/directories to rename:**
-
-```
-src/xbox_controller_api/            --> src/<your_lib>/
-src/xbox_controller_api_kernels/    --> src/<your_lib>_kernels/    (if using CUDA)
-src/cmake/xbox_controller_apiConfig.cmake.in  --> src/cmake/<your_project>Config.cmake.in
-```
-
-**CMakeLists.txt** (root project definition):
-
-```cmake
-set(project_name "your_project_name")
-set(project_description "Short project description")
-set(project_homepage_url "https://example.com/your_project_name")
-set(PROJECT_MAINTAINER_NAME "Project Maintainer" CACHE STRING "Project maintainer name")
-set(PROJECT_MAINTAINER_EMAIL "maintainer@example.com" CACHE STRING "Project maintainer email")
-set(PROJECT_LICENSE "Apache-2.0" CACHE STRING "Project SPDX license identifier")
-```
-
-**What to keep as-is:** the entire `cmake/` module system, `build_lib.sh`, `configure_devcontainer.sh`, and `generate_version.sh`. Keep `profiling/` only when the project needs the optional Valgrind/perf helper scripts.
-
----
-
 ## Build Options
 
 All options are passed via `build_lib.sh` flags or directly as `-D<VAR>=<VAL>` to CMake.
@@ -181,7 +123,6 @@ All options are passed via `build_lib.sh` flags or directly as `-D<VAR>=<VAL>` t
     --skip-tests          Do not run tests after build
 -i, --install             Run install target after tests
 -p, --python-wrap         Enable Python wrappers
--m, --matlab-wrap         Enable MATLAB wrappers
     --python-test-conda-env <name>
                           Run test*.py CTest entries with conda run -n <name>
     --python-test-conda-prefix <dir>
@@ -212,9 +153,6 @@ ignored with `--rebuild-only`.
 
 | Option | Default | Description |
 |---|---|---|
-| `xbox_controller_api_ENABLE_CUDA` | OFF | CUDA GPU acceleration |
-| `xbox_controller_api_ENABLE_OPTIX` | OFF | NVIDIA OptiX (enables CUDA automatically) |
-| `xbox_controller_api_ENABLE_TENSORRT` | OFF | NVIDIA TensorRT (enables CUDA automatically) |
 | `xbox_controller_api_METADATA_ONLY` | OFF | Configure project identity/version without compiler languages |
 | `ENABLE_TBB` | OFF | Intel oneTBB support (`find_package(TBB)`) |
 | `ENABLE_OPENGL` | OFF | OpenGL support |
@@ -227,7 +165,7 @@ ignored with `--rebuild-only`.
 | `PYTHON_TEST_CONDA_PREFIX` | `""` | Optional conda environment prefix for pytest tests |
 | `ENABLE_PROFILING` | OFF | Profiling-friendly flags; enables `ENABLE_GPERFTOOLS` by default |
 | `ENABLE_GPERFTOOLS` | `ENABLE_PROFILING` | Link gperftools `libprofiler` when found |
-| `ENABLE_TCMALLOC` | OFF | Explicitly link gperftools `libtcmalloc`; keep OFF for normal MATLAB MEX builds |
+| `ENABLE_TCMALLOC` | OFF | Explicitly link gperftools `libtcmalloc`; keep OFF for normal builds |
 | `BUILD_SHARED_LIBS` | ON | Build compiled libraries as shared (`OFF` builds static archives) |
 | `xbox_controller_api_BUILD_PROGRAMS` | ON | Build root program targets when this project is the main project |
 | `xbox_controller_api_BUILD_EXAMPLES` | ON | Build example targets when this project is the main project |
@@ -238,17 +176,11 @@ ignored with `--rebuild-only`.
 | `CPU_SIMD_LEVEL` | `native` | SIMD target: `native`, `sse4.2`, `avx`, `avx2`, `avx512f` |
 | `CPU_ENABLE_FMA` | OFF | Adds `-mfma` for GNU/Clang optimized builds |
 | `CPU_EXTRA_OPT_FLAGS` | `""` | Extra CPU optimization flags for optimized builds |
-| `CUDA_ENABLE_FMAD` | ON | NVCC fused multiply-add control (`--fmad=true/false`) |
-| `CUDA_ENABLE_EXTRA_DEVICE_VECTORIZATION` | OFF | Adds NVCC `--extra-device-vectorization` |
-| `CUDA_USE_FAST_MATH` | OFF | Adds NVCC `--use_fast_math` to regular CUDA builds |
-| `CUDA_PTX_USE_FAST_MATH` | ON | Adds NVCC `--use_fast_math` to PTX generation path |
-| `CUDA_NVCC_EXTRA_FLAGS` | `""` | Extra NVCC flags for CUDA and PTX compilation |
 | `NO_OPTIMIZATION` | OFF | Force profiler-friendly `-O0 -g3`, frame pointers, and assertions regardless of build type |
 | `WARNINGS_ARE_ERRORS` | OFF | Treat all warnings as errors (`-Werror`) |
 
-Replace the `xbox_controller_api` prefix during tailoring. The historical
-`ENABLE_CUDA`, `ENABLE_OPTIX`, `ENABLE_TENSORRT`, and `PROJECT_METADATA_ONLY`
-remain top-level compatibility aliases; nested consumers must use the
+The historical `PROJECT_METADATA_ONLY` spelling
+remains a top-level compatibility alias; nested consumers must use the
 project-qualified forms so parent cache options cannot change the library
 configuration. A legacy alias supplied to a top-level configure wins for that
 invocation, is copied to the canonical option, and is then removed from the
@@ -267,61 +199,6 @@ cache so later reconfigures cannot retain two conflicting sources of truth.
 ---
 
 ## Optional Features
-
-### CUDA / OptiX
-
-```bash
-./build_lib.sh -D ENABLE_CUDA=ON
-./build_lib.sh -D ENABLE_CUDA=ON -D ENABLE_OPTIX=ON
-```
-
-GPU architecture is auto-detected via `nvidia-smi`. CUDA kernels live in `src/xbox_controller_api_kernels/`:
-
-- `.cu` files - standard CUDA kernels
-- `.ptx.cu` files - compiled to embedded `const char[]` arrays for OptiX modules
-
-Auto-detection is intentionally strict:
-
-- On `x86_64`/`amd64`, a working `nvidia-smi` is required unless you set `CUDA_ARCHITECTURES` or `CMAKE_CUDA_ARCHITECTURES` explicitly.
-- On `aarch64`/`arm64`, the template first tries `nvidia-smi`, then falls back to native Jetson/Tegra markers for Xavier (`72`), Orin (`87`), and Thor (`101`).
-- If detection is unavailable or ambiguous, configure fails with guidance to set `CUDA_ARCHITECTURES` or `CMAKE_CUDA_ARCHITECTURES` explicitly.
-
-Example with explicit CUDA optimization toggles:
-
-```bash
-./build_lib.sh -D ENABLE_CUDA=ON \
-  -D CUDA_ARCHITECTURES=87 \
-  -D CUDA_ENABLE_FMAD=ON \
-  -D CUDA_ENABLE_EXTRA_DEVICE_VECTORIZATION=ON \
-  -D CUDA_NVCC_EXTRA_FLAGS="--maxrregcount=128"
-```
-
-When `ENABLE_OPTIX=ON`, configuration also fails fast unless the project contains:
-
-- at least one compilable library source under `src/` (`*.cpp` or `*.cu`, excluding `*.ptx.cu`, and excluding `src/bin/`)
-- at least one PTX kernel source (`*.ptx.cu`)
-
-This template treats OptiX on a header-only library as a configuration error.
-
-### TensorRT
-
-TensorRT is opt-in and enables the CUDA feature automatically. Point either
-`TensorRT_ROOT` or the compatibility spelling `TENSORRT_ROOT` at an SDK root
-containing `include/` and `lib/`, or at an NVIDIA archive layout containing
-`targets/<triplet>/include` and `targets/<triplet>/lib`:
-
-```bash
-./build_lib.sh -D ENABLE_TENSORRT=ON \
-  -D TensorRT_ROOT=/opt/TensorRT \
-  -D CUDA_ARCHITECTURES=87
-```
-
-The project target propagates `TensorRT::nvinfer`,
-`TensorRT::nvinfer_plugin`, `CUDA::cudart`, and
-`__TENSORRT_ENABLED__=1`. Installed consumers of a TensorRT-enabled build must
-make a compatible SDK discoverable through the same root hints. The installed
-package resolves its own finder directly and does not modify the consumer's
-`CMAKE_MODULE_PATH`.
 
 ### TBB
 
@@ -355,14 +232,14 @@ package resolves its own finder directly and does not modify the consumer's
 
 ---
 
-## Python and MATLAB Wrappers (gtwrap)
+## Python Wrappers (gtwrap)
 
-This template supports wrappers via `gtwrap` in two modes:
+The project supports Python bindings via `gtwrap` in two modes:
 
 1. Installed package mode (`find_package(gtwrap)`).
 2. Local checkout mode (`--gtwrap-root /path/to/wrap` or `-D<project>_GTWRAP_ROOT_DIR=...`).
 
-When `-p` and/or `-m` is used, wrapper resolution now follows this order:
+When `-p` is used, wrapper resolution follows this order:
 
 1. Use an explicit `--gtwrap-root` or an existing local checkout at `./wrap`,
    `./lib/wrap`, or `../wrap`.
@@ -394,11 +271,8 @@ The default wrapper entrypoint is `src/wrap_interface.i`. If it is missing or th
 ### Build examples
 
 ```bash
-# Python wrapper only
+# Python wrapper
 ./build_lib.sh -p
-
-# Python + MATLAB wrappers
-./build_lib.sh -p -m
 
 # Force local wrap checkout
 ./build_lib.sh -p --gtwrap-root /path/to/wrap
@@ -415,10 +289,9 @@ The default wrapper entrypoint is `src/wrap_interface.i`. If it is missing or th
 
 If your wrapper interface uses `gtsam::Vector`/`gtsam::Matrix` without a full GTSAM dependency, include `src/utils/wrap_adapters/GtsamAliases.h` in `src/wrap_interface.i` to alias them to Eigen types.
 
-Wrapper generators produce different C++ files by design:
+Wrapper generation output:
 
-1. Python (pybind): `<build>/wrap_interface.cpp` (from top-level `wrap_interface.i`).
-2. MATLAB: `<build>/wrap/<project>/<project>_wrapper.cpp`.
+Python (pybind) generates `<build>/wrap_interface.cpp` from the top-level `wrap_interface.i`.
 
 ### Python package install workflow
 
@@ -525,69 +398,33 @@ Then link:
 target_link_libraries(my_target PRIVATE my_project::my_project)
 ```
 
-See [`examples/template_consumer_project/`](examples/template_consumer_project/) for a complete working example.
-
----
-
-## Profiling
-
-### Profiling-friendly build
-
-`--profile` adds `-fno-omit-frame-pointer -fno-inline-functions` to all build types - required for `perf` and `callgrind` to produce accurate call stacks even in optimized builds. Optionally links `gperftools` if found.
-
-```bash
-./build_lib.sh --profile -t relwithdebinfo
-```
-
-### Profiling scripts
-
-Three wrapper scripts live in `profiling/`. All share common options:
-`-e <executable>`, `-o <output_dir>`, `-a "<args>"`, `-t <trials>`, `-i <start_index>`.
-
-```bash
-# Call graph analysis (valgrind callgrind)
-./profiling/run_call_profiling.sh -e ./build/my_exe -o prof_results -t 3
-
-# Heap memory profiling (valgrind massif)
-./profiling/run_mem_complexity.sh -e ./build/my_exe -o prof_results
-
-# CPU cycles / instruction count (perf)
-./profiling/run_ops_profiling.sh  -e ./build/my_exe -o prof_results
-```
-
-Scripts auto-detect whether `sudo` is needed (skipped when running as root, e.g. inside a devcontainer).
-
-Output files are written to `<output_dir>/` and are gitignored by default.
+See [`examples/consumer_project/`](examples/consumer_project/) for a complete working example.
 
 ---
 
 ## DevContainer
 
-The project ships a VS Code DevContainer configuration. To reconfigure it (base image, ROS, CUDA):
+The project ships a VS Code DevContainer configuration. To reconfigure it (base image, ROS):
 
 ```bash
 # Interactive
 ./configure_devcontainer.sh
 
 # Non-interactive
-./configure_devcontainer.sh --cuda --gpu-runtime podman --base ubuntu-24.04
 ./configure_devcontainer.sh --base ubuntu-22.04 --ros noetic --ros-profile desktop
 ./configure_devcontainer.sh --non-interactive --base ubuntu-24.04
 ```
 
 ROS 1 requires Ubuntu 18.04 (melodic) or 20.04 (noetic).
 
-<!-- ros2-overlay-begin -->
 ROS 2 devcontainer example:
 
 ```bash
-./configure_devcontainer.sh --cuda --base ubuntu-22.04 --ros2 humble
 ```
 
 ROS 2 requires Ubuntu 22.04+.
-<!-- ros2-overlay-end -->
 
-The configure script only rewrites the keys it manages in `devcontainer.json` (features, GPU run args, CUDA/ROS env); project-specific entries (e.g. `customizations`, extra `remoteEnv` variables) are preserved across reconfigurations. CUDA toolkit version is selected with `--cuda-version <v>` (default 12.9). GPU passthrough args are selected with `--gpu-runtime auto|docker|podman` (default: `auto`, which prefers Docker when both engines are installed).
+The configure script only rewrites the keys it manages in `devcontainer.json` (features, GPU run args, ROS env); project-specific entries (e.g. `customizations`, extra `remoteEnv` variables) are preserved across reconfigurations. GPU passthrough args are selected with `--gpu-runtime auto|docker|podman` (default: `auto`, which prefers Docker when both engines are installed).
 
 ### GPU host requirements
 
@@ -635,17 +472,6 @@ Docker attachment mode also requires the image's `vscode` UID and GID to match
 the host user; the launcher rejects a mismatch rather than creating files with
 ambiguous ownership.
 
-Expose a host MATLAB installation to wrapper configuration with:
-
-```bash
-./run_in_container.sh --vscode --engine podman \
-    --matlab-root /usr/local/MATLAB/R2024b
-```
-
-The installation is mounted read-only at the same absolute path and exported
-as `MATLAB_ROOT_DIR`. Because mounts are fixed at container creation, stop and
-recreate an existing attachment container before changing the MATLAB root.
-
 ---
 
 ## Documentation
@@ -674,19 +500,21 @@ The docs target is created only for the top-level project. Nested template-deriv
 
 ```
 ├── src/
-│   ├── xbox_controller_api/            Core C++ library implementation
-│   ├── xbox_controller_api_kernels/    CUDA kernels (.cu) and PTX sources (.ptx.cu)
-│   ├── wrapped_impl/            C wrapper layer for Python/MATLAB bindings
+│   ├── xbox_controller_api/     Core C++ library implementation
+│   ├── wrapped_impl/            C wrapper layer for the Python bindings
+│   ├── utils/logging/           Dependency-free component logger
 │   ├── config.h.in              CMake-configured header (version, feature flags)
 │   └── global_includes.h        Shared utilities (ANSI colors, precision constants)
 ├── cmake/                       CMake module system (Handle*.cmake)
-├── profiling/                   Optional Valgrind/perf wrapper scripts
-├── tests/                       Inherited runtime tests and reusable fixtures
+├── python/                      Python package sources and packaging templates
+├── ros2/                        Optional ROS 2 overlay (colcon workspace)
+├── tests/                       Runtime tests and reusable fixtures
 ├── examples/
-│   ├── template_consumer_project/   Using the library via find_package()
-│   └── template_examples/           Standalone usage examples
-├── doc/                         Doxygen configuration
+│   ├── consumer_project/               Using the library via find_package()
+│   └── xbox_controller_api_examples/   Standalone usage examples
+├── doc/                         Doxygen configuration and guides
 ├── build_lib.sh                 Primary build entry point
+├── build_ros2.sh                Optional ROS 2 overlay build entry point
 ├── generate_version.sh          Write VERSION file without building
 └── configure_devcontainer.sh    Reconfigure VS Code DevContainer
 ```

@@ -11,7 +11,7 @@ set(PROJECT_PYTHON_VERSION 3.12)
 # PROJECT DEFINITION
 set(project_name "xbox_controller_api")
 set(project_description
-    "Reusable C++ library template with optional Python and ROS 2 support")
+    "C++ library for reading Xbox controller input, with optional Python bindings and ROS 2 integration")
 set(project_homepage_url "https://github.com/PeterCalifano/xbox-controller-api")
 set(PROJECT_MAINTAINER_NAME "Pietro Califano" CACHE STRING "Project maintainer name")
 set(PROJECT_MAINTAINER_EMAIL "petercalifano.gs@gmail.com" CACHE STRING "Project maintainer email")
