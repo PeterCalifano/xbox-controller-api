@@ -117,6 +117,7 @@ if (DEFINED LIB_NAMESPACE_OVERRIDE)
   set(LIB_NAMESPACE "${LIB_NAMESPACE_OVERRIDE}")
 endif()
 set(OPENGL_COMPILE_TARGET "${LIB_NAMESPACE}_opengl_compile_interface")
+set(SDL2_COMPILE_TARGET "${LIB_NAMESPACE}_sdl2_compile_interface")
 set(LIB_COMPILE_TARGET "${LIB_NAMESPACE}_lib_compile_interface")
 set(SANITIZER_TARGET "${LIB_NAMESPACE}_sanitizer_target_interface")
 
@@ -301,6 +302,10 @@ endif()
 include(cmake/HandleOpenGL.cmake)
 handle_opengl(TARGET ${OPENGL_COMPILE_TARGET})
 
+# Handle SDL2 (creates interface targets even when disabled)
+include(cmake/HandleSDL2.cmake)
+handle_sdl2(TARGET ${SDL2_COMPILE_TARGET})
+
 # Add submodules if any found
 include(cmake/HandleSubmodules.cmake)
 handle_submodules() # Automatically adds subdirectories in lib/ (and build them if CMakeLists.txt found)
@@ -313,6 +318,11 @@ if (ENABLE_OPENGL)
 endif()
 if(ENABLE_TBB)
   list(APPEND EXPORT_TARGET_DEPS TBB)
+endif()
+# Advertise SDL2 to consumers only when it was resolved through its CMake
+# package, since that is the sole discovery mode find_dependency can reproduce.
+if(SDL2_ENABLED AND SDL2_FOUND_VIA_CONFIG)
+  list(APPEND EXPORT_TARGET_DEPS SDL2)
 endif()
 
 message(STATUS "Target dependencies: ${EXPORT_TARGET_DEPS}")
@@ -433,6 +443,9 @@ message(STATUS "CPU extra optimization flags             : ${CPU_EXTRA_OPT_FLAGS
 message(STATUS "Project extra C flags                    : ${EXTRA_C_FLAGS}")
 message(STATUS "Project extra C++ flags                  : ${EXTRA_CXX_FLAGS}")
 message(STATUS "OpenCV found                             : ${OpenCV_FOUND}")
+message(STATUS "SDL2 backend requested                   : ${ENABLE_SDL2}")
+message(STATUS "SDL2 backend enabled                     : ${SDL2_ENABLED}")
+message(STATUS "SDL2 version                             : ${SDL2_RESOLVED_VERSION}")
 message(STATUS "Catch2 test reporter                     : ${CATCH2_TEST_REPORTER}")
 message(STATUS "Python tests enabled                     : ${ENABLE_PYTHON_TESTS}")
 message(STATUS "Python test conda env                    : ${PYTHON_TEST_CONDA_ENV}")

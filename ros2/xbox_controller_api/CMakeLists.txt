@@ -9,6 +9,7 @@ get_filename_component(XBOX_CONTROLLER_API_REPOSITORY_ROOT
 
 set(ENABLE_TESTS OFF CACHE BOOL "Disable core template tests in the ROS 2 overlay build." FORCE)
 set(ENABLE_FETCH_CATCH2 OFF CACHE BOOL "Do not fetch Catch2 while building the ROS 2 overlay." FORCE)
+set(ENABLE_SDL2 OFF CACHE BOOL "Do not build the SDL2 gamepad backend in the ROS 2 overlay." FORCE)
 
 # The root CMakeLists appends PROJECT_SOURCE_DIR/cmake before its project()
 # call, which points at this shim during nested configure. Keep the real helper
