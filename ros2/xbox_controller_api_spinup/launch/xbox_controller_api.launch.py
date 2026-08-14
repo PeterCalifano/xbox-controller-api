@@ -15,7 +15,7 @@ def generate_launch_description() -> LaunchDescription:
         LifecycleNode(
             package="xbox_controller_api_ros",
             executable="xbox_controller_api_node",
-            name="template_algorithm",
+            name="xbox_controller",
             namespace="",
             output="screen",
             parameters=[charParamsFile_],
@@ -25,7 +25,7 @@ def generate_launch_description() -> LaunchDescription:
         # Node(
         #     package="xbox_controller_api_ros",
         #     executable="xbox_controller_api_node",
-        #     name="template_algorithm",
+        #     name="xbox_controller",
         #     output="screen",
         #     parameters=[charParamsFile_],
         # )

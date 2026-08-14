@@ -81,7 +81,7 @@ def generate_launch_description() -> LaunchDescription:
     objLifecycleNode_ = ComposableLifecycleNode(
         package="xbox_controller_api_ros",
         plugin="xbox_controller_api_ros::CXboxControllerLifecycleNode",
-        name="template_algorithm",
+        name="xbox_controller",
         parameters=[charParamsFile_],
         autostart=True,
     )
@@ -99,7 +99,7 @@ def generate_launch_description() -> LaunchDescription:
                 # ComposableNode(
                 #     package="xbox_controller_api_ros",
                 #     plugin="xbox_controller_api_ros::CXboxControllerLifecycleNode",
-                #     name="template_algorithm",
+                #     name="xbox_controller",
                 #     parameters=[charParamsFile_],
                 # )
             ],

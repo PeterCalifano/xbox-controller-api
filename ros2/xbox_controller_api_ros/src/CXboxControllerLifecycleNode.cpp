@@ -11,7 +11,7 @@ using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface
 }  // namespace
 
 CXboxControllerLifecycleNode::CXboxControllerLifecycleNode(const rclcpp::NodeOptions& objOptions_)
-    : rclcpp_lifecycle::LifecycleNode("template_algorithm", objOptions_),
+    : rclcpp_lifecycle::LifecycleNode("xbox_controller", objOptions_),
       dGain_(1.0),
       dBias_(0.0),
       uiEvaluationCount_(0U) {
@@ -32,7 +32,7 @@ CallbackReturn CXboxControllerLifecycleNode::on_configure(const rclcpp_lifecycle
         handleRunAlgorithm(objRequest_, std::move(objResponse_));
       });
 
-  RCLCPP_INFO(get_logger(), "Configured template algorithm with gain=%f bias=%f", dGain_, dBias_);
+  RCLCPP_INFO(get_logger(), "Configured xbox controller with gain=%f bias=%f", dGain_, dBias_);
   return CallbackReturn::SUCCESS;
 }
 
@@ -40,7 +40,7 @@ CallbackReturn CXboxControllerLifecycleNode::on_activate(const rclcpp_lifecycle:
   if (objStatusPublisher_) {
     objStatusPublisher_->on_activate();
   }
-  RCLCPP_INFO(get_logger(), "Activated template algorithm node");
+  RCLCPP_INFO(get_logger(), "Activated xbox controller node");
   return CallbackReturn::SUCCESS;
 }
 
@@ -48,7 +48,7 @@ CallbackReturn CXboxControllerLifecycleNode::on_deactivate(const rclcpp_lifecycl
   if (objStatusPublisher_) {
     objStatusPublisher_->on_deactivate();
   }
-  RCLCPP_INFO(get_logger(), "Deactivated template algorithm node");
+  RCLCPP_INFO(get_logger(), "Deactivated xbox controller node");
   return CallbackReturn::SUCCESS;
 }
 
@@ -56,7 +56,7 @@ CallbackReturn CXboxControllerLifecycleNode::on_cleanup(const rclcpp_lifecycle::
   objService_.reset();
   objStatusPublisher_.reset();
   uiEvaluationCount_ = 0U;
-  RCLCPP_INFO(get_logger(), "Cleaned up template algorithm node");
+  RCLCPP_INFO(get_logger(), "Cleaned up xbox controller node");
   return CallbackReturn::SUCCESS;
 }
 

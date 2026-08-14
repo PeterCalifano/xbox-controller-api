@@ -103,7 +103,7 @@ class TestSpinupLaunch(unittest.TestCase):
         charNamespace_: str,
     ) -> None:
         charNamespacePrefix_ = f"/{charNamespace_}" if charNamespace_ else ""
-        charNodePath_ = f"{charNamespacePrefix_}/template_algorithm"
+        charNodePath_ = f"{charNamespacePrefix_}/xbox_controller"
         charCase_ = f"launch={charLaunchFile_}, namespace={charNamespace_ or '<root>'}"
         self._waitForActive(charNodePath_, charCase_)
 
