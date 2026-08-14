@@ -6,7 +6,7 @@ derived project normally configures and uses it rather than replacing it.
 
 ## Design
 
-`template_project::logging::CLogger` combines the useful parts of two existing
+`xbox_controller_api::logging::CLogger` combines the useful parts of two existing
 local patterns:
 
 - the component and severity format, ordered threshold, stream routing, and
@@ -53,7 +53,7 @@ TEMPLATE_PROJECT_LOG_LEVEL=debug ./build/src/bin/example_program
 
 int main()
 {
-    template_project::logging::CLogger objLogger_("example_program");
+    xbox_controller_api::logging::CLogger objLogger_("example_program");
     objLogger_.setLevelFromEnvironment();
     objLogger_.info("Processing ", 3, " inputs.");
     objLogger_.debug("Detailed diagnostics are enabled.");
@@ -79,10 +79,10 @@ Custom streams make output capture explicit in tests and applications:
 ```cpp
 std::ostringstream objOutputStream_;
 std::ostringstream objDiagnosticStream_;
-template_project::logging::CLogger objLogger_(
+xbox_controller_api::logging::CLogger objLogger_(
     "worker",
-    template_project::logging::ELogLevel::Info,
-    template_project::logging::ELogColorMode::Disabled,
+    xbox_controller_api::logging::ELogLevel::Info,
+    xbox_controller_api::logging::ELogColorMode::Disabled,
     objOutputStream_,
     objDiagnosticStream_);
 ```

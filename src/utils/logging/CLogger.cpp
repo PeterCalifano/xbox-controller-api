@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <mutex>
 
-namespace template_project::logging
+namespace xbox_controller_api::logging
 {
     namespace
     {
@@ -233,4 +233,4 @@ namespace template_project::logging
             return {};
         }
     }
-} // namespace template_project::logging
+} // namespace xbox_controller_api::logging

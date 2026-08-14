@@ -11,7 +11,7 @@
 #include <string_view>
 #include <utility>
 
-namespace template_project::logging
+namespace xbox_controller_api::logging
 {
     /**
      * @brief Ordered logging threshold used by CLogger.
@@ -189,4 +189,4 @@ namespace template_project::logging
         std::ostream &objOutputStream_;
         std::ostream &objDiagnosticStream_;
     };
-} // namespace template_project::logging
+} // namespace xbox_controller_api::logging

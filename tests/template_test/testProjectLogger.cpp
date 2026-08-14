@@ -54,7 +54,7 @@ namespace
 
 TEST_CASE("project logger filters levels and routes complete lines", "[logging]")
 {
-    using namespace template_project::logging;
+    using namespace xbox_controller_api::logging;
 
     std::ostringstream objOutputStream_;
     std::ostringstream objDiagnosticStream_;
@@ -76,7 +76,7 @@ TEST_CASE("project logger filters levels and routes complete lines", "[logging]"
 
 TEST_CASE("project logger parses named and numeric levels", "[logging]")
 {
-    using namespace template_project::logging;
+    using namespace xbox_controller_api::logging;
 
     REQUIRE(CLogger::tryParseLevel("quiet") == ELogLevel::Quiet);
     REQUIRE(CLogger::tryParseLevel("CRITICAL") == ELogLevel::Critical);
@@ -90,7 +90,7 @@ TEST_CASE("project logger parses named and numeric levels", "[logging]")
 
 TEST_CASE("project logger reads levels from the selected environment variable", "[logging]")
 {
-    using namespace template_project::logging;
+    using namespace xbox_controller_api::logging;
 
     constexpr const char *charTestVariableName_ = "TEMPLATE_PROJECT_TEST_LOG_LEVEL";
     CEnvironmentVariableGuard objEnvironmentGuard_(charTestVariableName_);
@@ -110,7 +110,7 @@ TEST_CASE("project logger reads levels from the selected environment variable", 
 
 TEST_CASE("project logger color is explicit and deterministic", "[logging]")
 {
-    using namespace template_project::logging;
+    using namespace xbox_controller_api::logging;
 
     std::ostringstream objOutputStream_;
     std::ostringstream objDiagnosticStream_;
@@ -125,7 +125,7 @@ TEST_CASE("project logger color is explicit and deterministic", "[logging]")
 
 TEST_CASE("project logger serializes concurrent writes as complete lines", "[logging]")
 {
-    using namespace template_project::logging;
+    using namespace xbox_controller_api::logging;
 
     constexpr std::size_t uiMessageCount_ = 16;
     std::ostringstream objOutputStream_;
