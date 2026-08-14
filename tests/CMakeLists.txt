@@ -9,8 +9,8 @@ set(TESTS_LIST "")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # Register C++, Python, and fixture runtime tests.
-add_subdirectory(template_test)
-add_subdirectory(template_fixtures)
+add_subdirectory(xbox_controller_api_test)
+add_subdirectory(xbox_controller_api_fixtures)
 
 # Register any test files placed directly under tests/.
 add_tests(${project_name} EXCLUDED_LIST TESTS_LIST "" CATCH2_TEST_PROPERTIES Catch2::Catch2WithMain)

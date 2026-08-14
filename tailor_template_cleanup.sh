@@ -37,7 +37,7 @@ Usage:
   ./tailor_template_cleanup.sh --apply --project-namespace <identifier> [--yes] [--root <dir>] [--keep-profiling] [--remove-ros2]
 
 Purpose:
-  Remove files that are only useful while developing cpp_cuda_template_project
+  Remove files that are only useful while developing cpp_cuda_xbox_controller_api
   itself while preserving reusable project files.
 
 Options:
@@ -45,7 +45,7 @@ Options:
   --apply         Remove template-owned files and tailor retained content.
   --yes           Do not prompt before applying.
   --project-namespace <identifier>
-                  Replace the template_project logger namespace.
+                  Replace the xbox_controller_api logger namespace.
   --root <dir>    Project root to clean. Defaults to the script directory.
   --keep-profiling
                   Keep profiling/ scripts. By default profiling/ is removed.
@@ -59,7 +59,7 @@ template_development_paths=(
     "CLAUDE.md"
     "CONTEXT.md"
     "TODO"
-    "cpp_cuda_template_project.code-workspace"
+    "cpp_cuda_xbox_controller_api.code-workspace"
     "doc/developments"
     "doc/reports"
 )
@@ -93,7 +93,7 @@ logger_namespace_paths=(
     "src/utils/logging/CLogger.h"
     "src/utils/logging/CLogger.cpp"
     "src/bin/example_program.cpp"
-    "src/template_src/placeholder.cpp"
+    "src/xbox_controller_api/placeholder.cpp"
     "tests/template_test/testProjectLogger.cpp"
     "doc/logging.md"
 )
@@ -127,7 +127,7 @@ Content edits made by --apply:
   - With --remove-ros2, strip <!-- ros2-overlay-begin/end --> fenced doc blocks.
 
 Logger namespace edit made by --apply:
-  - --project-namespace replaces template_project::logging in the reusable logger files.
+  - --project-namespace replaces xbox_controller_api::logging in the reusable logger files.
 
 Not removed:
   - cmake/ production modules, including TensorRT discovery/integration and
@@ -193,8 +193,8 @@ validate_project_namespace() {
         || die "--project-namespace is required with --apply"
     [[ "${PROJECT_NAMESPACE}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] \
         || die "Invalid project namespace: ${PROJECT_NAMESPACE}"
-    [[ "${PROJECT_NAMESPACE}" != "template_project" ]] \
-        || die "Invalid project namespace: template_project"
+    [[ "${PROJECT_NAMESPACE}" != "xbox_controller_api" ]] \
+        || die "Invalid project namespace: xbox_controller_api"
 }
 
 validate_root() {
@@ -213,14 +213,14 @@ tailor_logger_namespace() {
         source_file_="${ROOT_DIR}/${relative_path_}"
         [[ -f "${source_file_}" ]] || continue
 
-        if ! grep -Fq "template_project::logging" "${source_file_}"; then
+        if ! grep -Fq "xbox_controller_api::logging" "${source_file_}"; then
             info "logger namespace already tailored in ${relative_path_}"
             continue
         fi
 
         tmp_="$(mktemp "${source_file_}.tmp.XXXXXX")"
         TEMPORARY_PATHS+=("${tmp_}")
-        sed "s/template_project::logging/${PROJECT_NAMESPACE}::logging/g" \
+        sed "s/xbox_controller_api::logging/${PROJECT_NAMESPACE}::logging/g" \
             "${source_file_}" > "${tmp_}"
         chmod --reference="${source_file_}" "${tmp_}"
         mv -f -- "${tmp_}" "${source_file_}"

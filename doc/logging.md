@@ -37,13 +37,13 @@ Levels are ordered from `Quiet` (`0`) through `Trace` (`6`). A configured level
 includes every less-verbose severity. For example, `Info` includes critical,
 error, warning, and info messages but filters debug and trace messages.
 
-`setLevelFromEnvironment()` reads `TEMPLATE_PROJECT_LOG_LEVEL` by default. It
+`setLevelFromEnvironment()` reads `XBOX_CONTROLLER_API_LOG_LEVEL` by default. It
 accepts case-insensitive names, the aliases `off`, `fatal`, and `warn`, or a
 numeric value from `0` to `6`. Missing or invalid values leave the current level
 unchanged and return `false`.
 
 ```bash
-TEMPLATE_PROJECT_LOG_LEVEL=debug ./build/src/bin/example_program
+XBOX_CONTROLLER_API_LOG_LEVEL=debug ./build/src/bin/example_program
 ```
 
 ## C++ usage
@@ -67,7 +67,7 @@ With the default level, the output is:
 [example_program][INFO] Processing 3 inputs.
 ```
 
-With `TEMPLATE_PROJECT_LOG_LEVEL=debug`, the output is:
+With `XBOX_CONTROLLER_API_LOG_LEVEL=debug`, the output is:
 
 ```text
 [example_program][INFO] Processing 3 inputs.

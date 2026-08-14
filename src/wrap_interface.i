@@ -2,7 +2,7 @@
 // Python wrapper definition file.
 //*************************************************************************
 
-namespace cpp_playground
+namespace xbox_controller_api
 {
 
 #include <utils/wrap_adapters/GtsamAliases.h>

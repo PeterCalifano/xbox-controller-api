@@ -22,8 +22,8 @@ Cross builds use CMake toolchain files under `cmake/toolchains/defaults/`. Nativ
 
 ```bash
 ./build_lib.sh --toolchain cmake/toolchains/defaults/aarch64-linux-gnu.cmake --clean \
-  -D template_project_BUILD_PROGRAMS=OFF \
-  -D template_project_BUILD_EXAMPLES=OFF
+  -D xbox_controller_api_BUILD_PROGRAMS=OFF \
+  -D xbox_controller_api_BUILD_EXAMPLES=OFF
 ```
 
 Use `CPU_EXTRA_OPT_FLAGS` for target-specific flags that are safe for the destination CPU.
@@ -36,7 +36,7 @@ CUDA is optional and enabled explicitly:
 ./build_lib.sh -D ENABLE_CUDA=ON
 ```
 
-CUDA source files live under `src/template_src_kernels/`.
+CUDA source files live under `src/xbox_controller_api_kernels/`.
 
 - `*.cu`: regular CUDA translation units
 - `*.ptx.cu`: PTX inputs compiled into embedded C arrays for OptiX modules

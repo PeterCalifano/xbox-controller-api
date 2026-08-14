@@ -208,11 +208,11 @@ The root project controls program and example targets through namespace-derived 
 
 ```bash
 ./build_lib.sh \
-  -D template_project_BUILD_PROGRAMS=OFF \
-  -D template_project_BUILD_EXAMPLES=OFF
+  -D xbox_controller_api_BUILD_PROGRAMS=OFF \
+  -D xbox_controller_api_BUILD_EXAMPLES=OFF
 ```
 
-After tailoring, replace `template_project` with the project namespace used by the root `CMakeLists.txt`.
+After tailoring, replace `xbox_controller_api` with the project namespace used by the root `CMakeLists.txt`.
 
 ## Troubleshooting
 

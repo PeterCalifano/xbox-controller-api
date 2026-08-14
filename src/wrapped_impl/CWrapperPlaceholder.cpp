@@ -3,7 +3,7 @@
 #include <iostream>
 #include <utility>
 
-namespace cpp_playground
+namespace xbox_controller_api
 {
 
     double CWrapperPlaceholder::getDataMember() const
@@ -46,4 +46,4 @@ namespace cpp_playground
         return value * 2.0;
     }
 
-} // namespace cpp_playground
+} // namespace xbox_controller_api

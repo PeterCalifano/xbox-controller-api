@@ -29,10 +29,10 @@ Use this order for a new library checkout:
    `add_subdirectory()` entry from `src/CMakeLists.txt`.
 6. Configure, build, and run CTest from a clean build directory.
 7. Inspect remaining template names with
-   `rg "template_project|template_src|template_src_kernels|cpp_playground"` and
+   `rg "xbox_controller_api|xbox_controller_api|xbox_controller_api_kernels|xbox_controller_api"` and
    keep only intentional references in examples or documentation.
 
-The cleanup script contains template-specific filenames and test names, so running it before a global `template_project` replacement avoids stale cleanup paths.
+The cleanup script contains template-specific filenames and test names, so running it before a global `xbox_controller_api` replacement avoids stale cleanup paths.
 
 ## Rename Checklist
 
@@ -40,10 +40,10 @@ Use one global replacement pass for the project name, then inspect the changed C
 
 | Template item | Replace with |
 |---|---|
-| `template_project` | Project/package name in snake_case |
-| `template_src` | Primary C++ module directory |
-| `template_src_kernels` | CUDA kernel module directory, or delete if CUDA is not used |
-| `cpp_playground` | Top C++ namespace exposed to wrappers |
+| `xbox_controller_api` | Project/package name in snake_case |
+| `xbox_controller_api` | Primary C++ module directory |
+| `xbox_controller_api_kernels` | CUDA kernel module directory, or delete if CUDA is not used |
+| `xbox_controller_api` | Top C++ namespace exposed to wrappers |
 
 Set the root project metadata beside `project_name` before building or rolling
 out the optional ROS overlay:
@@ -66,12 +66,12 @@ When the optional ROS 2 overlay is kept, include these paths and identifiers in 
 
 | Template item | Replace with |
 |---|---|
-| `ros2/template_project` | `ros2/<ros_prefix>` shim directory |
-| `template_project_interfaces` | `<ros_prefix>_interfaces` |
-| `template_project_ros` | `<ros_prefix>_ros` |
-| `template_project_spinup` | `<ros_prefix>_spinup` |
+| `ros2/xbox_controller_api` | `ros2/<ros_prefix>` shim directory |
+| `xbox_controller_api_interfaces` | `<ros_prefix>_interfaces` |
+| `xbox_controller_api_ros` | `<ros_prefix>_ros` |
+| `xbox_controller_api_spinup` | `<ros_prefix>_spinup` |
 
-The broad `template_project` replacement also updates copied ROS launch/config names, interface package references, and workflow text. After renaming, update the EDIT-ME core-call block in `ros2/<ros_prefix>_ros/src/conversions.cpp`.
+The broad `xbox_controller_api` replacement also updates copied ROS launch/config names, interface package references, and workflow text. After renaming, update the EDIT-ME core-call block in `ros2/<ros_prefix>_ros/src/conversions.cpp`.
 
 When the CMake package name is not a valid ROS package name, keep the original CMake package name for core `find_package(...)` and `<project>::<project>` target links, and use a ROS-valid package prefix for copied ROS package names. For example, `space-nav-frontend` should keep core CMake references to `space-nav-frontend` while using ROS package paths such as `ros2/space_nav_frontend_ros`.
 
@@ -99,10 +99,10 @@ Update these files first:
   `PROJECT_MAINTAINER_NAME`, `PROJECT_MAINTAINER_EMAIL`, and `PROJECT_LICENSE`
 - `CMakeLists.txt`: default wrapper namespace value if wrappers are used
 - `src/CMakeLists.txt`: module `add_subdirectory()` entries and status messages
-- `src/cmake/template_projectConfig.cmake.in`: rename file and package references
+- `src/cmake/xbox_controller_apiConfig.cmake.in`: rename file and package references
 - `src/bin/`, `examples/`, and `tests/`: include paths and starter class names
 - `python/pyproject.toml.in`: package metadata
-- `python/template_project/`: package directory name
+- `python/xbox_controller_api/`: package directory name
 - `.github/workflows/*.yml`: workflow names, artifact names, and renamed CMake option prefixes when useful
 - `README.md` and `doc/main_page.md`: public project name and usage notes
 
@@ -237,7 +237,7 @@ By default this also removes `profiling/`. Keep those scripts only when the new 
 ./tailor_template_cleanup.sh --apply --yes --project-namespace my_project --keep-profiling
 ```
 
-The script replaces `template_project::logging` with the required project
+The script replaces `xbox_controller_api::logging` with the required project
 namespace, then removes agent/context notes, internal development and review
 records, optional profiling scripts, and the workspace file tied to this
 template checkout. It keeps reusable project infrastructure such as `cmake/`

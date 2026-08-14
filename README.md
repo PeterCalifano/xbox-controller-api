@@ -1,4 +1,4 @@
-# cpp_cuda_template_project
+# cpp_cuda_xbox_controller_api
 
 A CMake template for building GPU-accelerated C++ libraries with optional CUDA,
 OptiX, TensorRT, Python/MATLAB bindings, and profiling support. Shared builds
@@ -24,15 +24,15 @@ Tailoring helper:
 ./tailor_template_cleanup.sh --apply --yes --project-namespace my_project
 ```
 
-The required namespace option replaces `template_project::logging` in the
+The required namespace option replaces `xbox_controller_api::logging` in the
 reusable logger sources and examples. Run the cleanup before a broad
-`template_project` replacement, because the script contains template-specific
+`xbox_controller_api` replacement, because the script contains template-specific
 cleanup paths. Root/test CMake files, starter tests, and project workflows
 remain unchanged. After cleanup succeeds, delete `tailor_template_cleanup.sh`
 or exclude it from the rename pass. `profiling/` is removed by default. Add
 `--keep-profiling` when the new project should keep the Valgrind/perf helper
 scripts. TensorRT discovery and integration remain available to tailored
-projects but stay dependency-neutral while `template_project_ENABLE_TENSORRT`
+projects but stay dependency-neutral while `xbox_controller_api_ENABLE_TENSORRT`
 is `OFF`.
 
 <!-- ros2-overlay-begin -->
@@ -135,16 +135,16 @@ To start a new project from this template, rename the following (all in one pass
 
 | Placeholder | Replace with |
 |---|---|
-| `template_project` | your project name (snake_case) |
-| `template_src` | your library module name |
-| `template_src_kernels` | your CUDA module name (or delete if no CUDA) |
+| `xbox_controller_api` | your project name (snake_case) |
+| `xbox_controller_api` | your library module name |
+| `xbox_controller_api_kernels` | your CUDA module name (or delete if no CUDA) |
 
 **Files/directories to rename:**
 
 ```
-src/template_src/            --> src/<your_lib>/
-src/template_src_kernels/    --> src/<your_lib>_kernels/    (if using CUDA)
-src/cmake/template_projectConfig.cmake.in  --> src/cmake/<your_project>Config.cmake.in
+src/xbox_controller_api/            --> src/<your_lib>/
+src/xbox_controller_api_kernels/    --> src/<your_lib>_kernels/    (if using CUDA)
+src/cmake/xbox_controller_apiConfig.cmake.in  --> src/cmake/<your_project>Config.cmake.in
 ```
 
 **CMakeLists.txt** (root project definition):
@@ -212,10 +212,10 @@ ignored with `--rebuild-only`.
 
 | Option | Default | Description |
 |---|---|---|
-| `template_project_ENABLE_CUDA` | OFF | CUDA GPU acceleration |
-| `template_project_ENABLE_OPTIX` | OFF | NVIDIA OptiX (enables CUDA automatically) |
-| `template_project_ENABLE_TENSORRT` | OFF | NVIDIA TensorRT (enables CUDA automatically) |
-| `template_project_METADATA_ONLY` | OFF | Configure project identity/version without compiler languages |
+| `xbox_controller_api_ENABLE_CUDA` | OFF | CUDA GPU acceleration |
+| `xbox_controller_api_ENABLE_OPTIX` | OFF | NVIDIA OptiX (enables CUDA automatically) |
+| `xbox_controller_api_ENABLE_TENSORRT` | OFF | NVIDIA TensorRT (enables CUDA automatically) |
+| `xbox_controller_api_METADATA_ONLY` | OFF | Configure project identity/version without compiler languages |
 | `ENABLE_TBB` | OFF | Intel oneTBB support (`find_package(TBB)`) |
 | `ENABLE_OPENGL` | OFF | OpenGL support |
 | `ENABLE_TESTS` | ON | Register and run CTest tests |
@@ -229,8 +229,8 @@ ignored with `--rebuild-only`.
 | `ENABLE_GPERFTOOLS` | `ENABLE_PROFILING` | Link gperftools `libprofiler` when found |
 | `ENABLE_TCMALLOC` | OFF | Explicitly link gperftools `libtcmalloc`; keep OFF for normal MATLAB MEX builds |
 | `BUILD_SHARED_LIBS` | ON | Build compiled libraries as shared (`OFF` builds static archives) |
-| `template_project_BUILD_PROGRAMS` | ON | Build root program targets when this project is the main project |
-| `template_project_BUILD_EXAMPLES` | ON | Build example targets when this project is the main project |
+| `xbox_controller_api_BUILD_PROGRAMS` | ON | Build root program targets when this project is the main project |
+| `xbox_controller_api_BUILD_EXAMPLES` | ON | Build example targets when this project is the main project |
 | `SANITIZE_BUILD` | OFF | Enable sanitizers (see `SANITIZERS` variable) |
 | `SANITIZERS` | `address,undefined,leak` | Comma-separated sanitizer list |
 | `CPU_ENABLE_NATIVE_TUNING` | ON for native, OFF for cross | Adds `-march=native -mtune=native` for GNU/Clang optimized native builds |
@@ -246,7 +246,7 @@ ignored with `--rebuild-only`.
 | `NO_OPTIMIZATION` | OFF | Force profiler-friendly `-O0 -g3`, frame pointers, and assertions regardless of build type |
 | `WARNINGS_ARE_ERRORS` | OFF | Treat all warnings as errors (`-Werror`) |
 
-Replace the `template_project` prefix during tailoring. The historical
+Replace the `xbox_controller_api` prefix during tailoring. The historical
 `ENABLE_CUDA`, `ENABLE_OPTIX`, `ENABLE_TENSORRT`, and `PROJECT_METADATA_ONLY`
 remain top-level compatibility aliases; nested consumers must use the
 project-qualified forms so parent cache options cannot change the library
@@ -275,7 +275,7 @@ cache so later reconfigures cannot retain two conflicting sources of truth.
 ./build_lib.sh -D ENABLE_CUDA=ON -D ENABLE_OPTIX=ON
 ```
 
-GPU architecture is auto-detected via `nvidia-smi`. CUDA kernels live in `src/template_src_kernels/`:
+GPU architecture is auto-detected via `nvidia-smi`. CUDA kernels live in `src/xbox_controller_api_kernels/`:
 
 - `.cu` files - standard CUDA kernels
 - `.ptx.cu` files - compiled to embedded `const char[]` arrays for OptiX modules
@@ -339,7 +339,7 @@ package resolves its own finder directly and does not modify the consumer's
 
 # AArch64 cross build using bundled toolchain defaults
 ./build_lib.sh --toolchain cmake/toolchains/defaults/aarch64-linux-gnu.cmake --clean \
-  -D template_project_BUILD_PROGRAMS=OFF -D template_project_BUILD_EXAMPLES=OFF
+  -D xbox_controller_api_BUILD_PROGRAMS=OFF -D xbox_controller_api_BUILD_EXAMPLES=OFF
 
 # Enable explicit AVX2 + FMA flags
 ./build_lib.sh -D CPU_ENABLE_SIMD=ON -D CPU_SIMD_LEVEL=avx2 -D CPU_ENABLE_FMA=ON
@@ -674,8 +674,8 @@ The docs target is created only for the top-level project. Nested template-deriv
 
 ```
 ├── src/
-│   ├── template_src/            Core C++ library implementation
-│   ├── template_src_kernels/    CUDA kernels (.cu) and PTX sources (.ptx.cu)
+│   ├── xbox_controller_api/            Core C++ library implementation
+│   ├── xbox_controller_api_kernels/    CUDA kernels (.cu) and PTX sources (.ptx.cu)
 │   ├── wrapped_impl/            C wrapper layer for Python/MATLAB bindings
 │   ├── config.h.in              CMake-configured header (version, feature flags)
 │   └── global_includes.h        Shared utilities (ANSI colors, precision constants)

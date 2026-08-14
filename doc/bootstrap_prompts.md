@@ -11,8 +11,8 @@ Ask only for values that cannot be inferred from the user request or repository 
    - Public display name for README, docs, and workflow titles.
    - C++ namespace for library and wrapper-facing APIs.
 2. Source layout:
-   - Main C++ module directory replacing `src/template_src/`.
-   - Whether CUDA is needed. If yes, CUDA module directory replacing `src/template_src_kernels/`; if no, remove the CUDA skeleton and matching `src/CMakeLists.txt` entry.
+   - Main C++ module directory replacing `src/xbox_controller_api/`.
+   - Whether CUDA is needed. If yes, CUDA module directory replacing `src/xbox_controller_api_kernels/`; if no, remove the CUDA skeleton and matching `src/CMakeLists.txt` entry.
    - Whether OptiX, TensorRT, oneTBB, OpenGL, examples, and standalone programs
      should remain supported as project options. Retaining a disabled optional
      feature does not add its SDK as a dependency.
@@ -53,7 +53,7 @@ Ask only for values that cannot be inferred from the user request or repository 
 6. Search for stale template identifiers:
 
    ```bash
-   rg "template_project|template_src|template_src_kernels|cpp_playground"
+   rg "xbox_controller_api|xbox_controller_api|xbox_controller_api_kernels|xbox_controller_api"
    ```
 
    Keep only intentional references in examples or documentation.
@@ -102,7 +102,7 @@ Execution flow:
 1. For a fresh template checkout, run `./tailor_template_cleanup.sh --apply --yes --project-namespace <cpp_namespace>` with or without `--remove-ros2`.
 2. For an existing derived repository without ROS support, prefer `./add_ros2_support.sh --root <repo> --apply --yes --verify`.
 3. Update the EDIT-ME core-call block in `ros2/<ros_prefix>_ros/src/conversions.cpp` to call the real library API. Use the ROS-valid prefix reported by `add_ros2_support.sh`, which may differ from the CMake project name.
-4. Review `ros2/<ros_prefix>_ros/src/CTemplateLifecycleNode.cpp` only when ROS node wiring, parameters, publishers, or services need changes.
+4. Review `ros2/<ros_prefix>_ros/src/CXboxControllerLifecycleNode.cpp` only when ROS node wiring, parameters, publishers, or services need changes.
 5. Validate `./build_ros2.sh --clean`; also validate `./build_lib.sh` when the rollout touched a derived repository.
 6. Report the ROS distro, node/topic names, edited files, and exact validation commands.
 <!-- ros2-overlay-end -->

@@ -188,7 +188,7 @@ ROS 2 overlay rollout plan
   CI workflow            : $([[ "${NO_CI}" == 1 ]] && printf 'skip' || printf 'copy if present')
 
 Required copies:
-  - ros2/ -> ros2/ with template_project renamed to ${ros_package_prefix}
+  - ros2/ -> ros2/ with xbox_controller_api renamed to ${ros_package_prefix}
   - build_ros2.sh -> build_ros2.sh
   - core CMake package references stay pointed at ${cmake_project_name}
 
@@ -314,7 +314,7 @@ replace_placeholder_in_file() {
 
   grep -Iq . "${file_path_}" || return 0
   REPLACEMENT_NAME="${ros_package_prefix}" perl -0pi -e \
-    's/(?<![A-Za-z0-9_])template_project(?=(_[A-Za-z0-9_]+)?\b)/$ENV{REPLACEMENT_NAME}/g' \
+    's/(?<![A-Za-z0-9_])xbox_controller_api(?=(_[A-Za-z0-9_]+)?\b)/$ENV{REPLACEMENT_NAME}/g' \
     "${file_path_}"
 }
 
@@ -337,7 +337,7 @@ replace_placeholder_in_path_component() {
 
   REPLACEMENT_NAME="${ros_package_prefix}" perl -e '
     my $value = shift;
-    $value =~ s/(?<![A-Za-z0-9_])template_project(?=(_[A-Za-z0-9_]+)?\b)/$ENV{REPLACEMENT_NAME}/g;
+    $value =~ s/(?<![A-Za-z0-9_])xbox_controller_api(?=(_[A-Za-z0-9_]+)?\b)/$ENV{REPLACEMENT_NAME}/g;
     print $value;
   ' -- "${path_component_}"
 }
@@ -376,7 +376,7 @@ rename_copied_paths() {
       new_path_="${path_dir_}/${new_base_}"
       [[ ! -e "${new_path_}" && ! -L "${new_path_}" ]] || die "Rename collision: ${new_path_}"
       mv "${path_}" "${new_path_}"
-    done < <(find "${root_path_}" -depth -name '*template_project*' -print0)
+    done < <(find "${root_path_}" -depth -name '*xbox_controller_api*' -print0)
   done
 }
 
@@ -416,7 +416,7 @@ print_post_apply_checklist() {
 
 Post-apply checklist:
   1. Adapt the fenced core-call seam in ros2/${ros_package_prefix}_ros/src/conversions.cpp to a real ${cmake_project_name} API.
-     Review ros2/${ros_package_prefix}_ros/src/CTemplateLifecycleNode.cpp only for ROS node wiring changes.
+     Review ros2/${ros_package_prefix}_ros/src/CXboxControllerLifecycleNode.cpp only for ROS node wiring changes.
   2. Run ./build_ros2.sh --clean in the target project.
   3. Adopt the root CMake metadata contract, including PROJECT_METADATA_ONLY, and upgrade
      generate_version.sh if it predates project metadata sync. Then run

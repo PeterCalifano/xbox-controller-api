@@ -1,4 +1,4 @@
-# cpp_cuda_template_project {#mainpage}
+# cpp_cuda_xbox_controller_api {#mainpage}
 
 See the [README](README.md) for the quick start, then use the focused guides below:
 
@@ -63,8 +63,8 @@ See `examples/template_consumer_project/` for a complete downstream CMake projec
 
 ## Adapting to a new project
 
-Replace all occurrences of `template_project` with your project name, rename
-`src/template_src/` and `src/template_src_kernels/`, and update
+Replace all occurrences of `xbox_controller_api` with your project name, rename
+`src/xbox_controller_api/` and `src/xbox_controller_api_kernels/`, and update
 `set(project_name ...)` in the root `CMakeLists.txt`.
 
 Full details are in `doc/template_usage.md`. Agents should use

@@ -45,7 +45,7 @@ Options:
 
 Examples:
   ./build_ros2.sh --clean
-  ./build_ros2.sh --packages-select template_project template_project_interfaces
+  ./build_ros2.sh --packages-select xbox_controller_api xbox_controller_api_interfaces
   ./build_ros2.sh --cmake-arg -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 EOF
 }
@@ -131,7 +131,7 @@ touch_root_colcon_ignore_markers() {
   local path_
 
   shopt -s nullglob
-  for path_ in "${ROOT_DIR}"/build* "${ROOT_DIR}"/install "${ROOT_DIR}"/template_subbuild; do
+  for path_ in "${ROOT_DIR}"/build* "${ROOT_DIR}"/install "${ROOT_DIR}"/xbox_controller_api_subbuild; do
     [[ -d "${path_}" ]] || continue
     if touch "${path_}/COLCON_IGNORE" 2>/dev/null; then
       info "ensured COLCON_IGNORE in ${path_#"${ROOT_DIR}"/}"

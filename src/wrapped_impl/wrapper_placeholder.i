@@ -2,7 +2,7 @@
 // Optional wrapper fragment example.
 //*************************************************************************
 
-namespace cpp_playground
+namespace xbox_controller_api
 {
 
 } // ACHTUNG: do not add semi-colon here!

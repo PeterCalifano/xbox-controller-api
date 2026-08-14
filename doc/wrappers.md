@@ -57,7 +57,7 @@ metadata for build-tree imports and wheel construction.
 ./build_lib.sh -p
 cd build/python
 python -m pip install .
-python -c "import template_project; assert template_project.HAS_WRAPPER"
+python -c "import xbox_controller_api; assert xbox_controller_api.HAS_WRAPPER"
 ```
 
 The package requires Python 3.12 or newer by default. Adjust `PROJECT_PYTHON_VERSION` in the root `CMakeLists.txt` and `requires-python` in `python/pyproject.toml.in` together.
@@ -103,10 +103,10 @@ Set `GTWRAP_ADD_DOCSTRINGS=ON` together with `BUILD_DOC_XML=ON` to generate Pyth
 
 ```bash
 cmake -S . -B build_wrap_docs \
-  -D template_project_BUILD_PYTHON_WRAPPER=ON \
+  -D xbox_controller_api_BUILD_PYTHON_WRAPPER=ON \
   -D GTWRAP_ADD_DOCSTRINGS=ON \
   -D BUILD_DOC_XML=ON
-cmake --build build_wrap_docs --target template_project_py
+cmake --build build_wrap_docs --target xbox_controller_api_py
 ```
 
 The XML source is the build-tree `doc/xml` directory for the project being built. It does not use `${CMAKE_SOURCE_DIR}/xml`, so nested template-derived libraries cannot leak their docs into the top project wrapper generation.

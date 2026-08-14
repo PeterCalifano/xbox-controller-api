@@ -9,10 +9,10 @@ set(PROJECT_PYTHON_VERSION 3.12)
 #set(CMAKE_CXX_COMPILER g++-11)
 
 # PROJECT DEFINITION
-set(project_name "template_project")
+set(project_name "xbox_controller_api")
 set(project_description
     "Reusable C++ library template with optional Python and ROS 2 support")
-set(project_homepage_url "https://github.com/PeterCalifano/cpp_cuda_template_project")
+set(project_homepage_url "https://github.com/PeterCalifano/xbox-controller-api")
 set(PROJECT_MAINTAINER_NAME "Pietro Califano" CACHE STRING "Project maintainer name")
 set(PROJECT_MAINTAINER_EMAIL "petercalifano.gs@gmail.com" CACHE STRING "Project maintainer email")
 set(PROJECT_LICENSE "MIT" CACHE STRING "Project SPDX license identifier")
@@ -33,7 +33,7 @@ endif()
 # historical generic spellings only as one-config top-level input aliases.
 set(METADATA_ONLY_OPTION_NAME "${project_name}_METADATA_ONLY")
 
-function(_template_project_migrate_top_level_bool_option_alias legacy_option
+function(_xbox_controller_api_migrate_top_level_bool_option_alias legacy_option
          canonical_option option_help)
   if(NOT BUILD_AS_MAIN_PROJECT)
     return()
@@ -53,7 +53,7 @@ function(_template_project_migrate_top_level_bool_option_alias legacy_option
   unset("${legacy_option}" CACHE)
 endfunction()
 
-_template_project_migrate_top_level_bool_option_alias(
+_xbox_controller_api_migrate_top_level_bool_option_alias(
     PROJECT_METADATA_ONLY "${METADATA_ONLY_OPTION_NAME}"
     "Configure only project identity and version metadata")
 
@@ -211,7 +211,7 @@ endif()
 
 if (NOT DEFINED ${GTWRAP_TOP_NAMESPACE_OPTION_NAME})
   set(${GTWRAP_TOP_NAMESPACE_OPTION_NAME}
-      "cpp_playground"
+      "xbox_controller_api"
       CACHE STRING
       "Top namespace used for gtwrap code generation."
       FORCE)

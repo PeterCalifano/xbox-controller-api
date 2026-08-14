@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-namespace cpp_playground
+namespace xbox_controller_api
 {
     class CWrapperPlaceholder
     {
@@ -25,4 +25,4 @@ namespace cpp_playground
         std::string charTextData_{"initial"};
     };
 
-} // namespace cpp_playground
+} // namespace xbox_controller_api

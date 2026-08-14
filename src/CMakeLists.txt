@@ -17,8 +17,8 @@ message(STATUS "Library src files found in ${CURRENT_FOLDER_NAME}: ${srcLibFiles
 message(STATUS "Adding module: utils")
 add_subdirectory(utils)
 
-message(STATUS "Adding module: template_src")
-add_subdirectory(template_src)
+message(STATUS "Adding module: xbox_controller_api")
+add_subdirectory(xbox_controller_api)
 
 message(STATUS "Adding module: wrapped_impl")
 add_subdirectory(wrapped_impl)
