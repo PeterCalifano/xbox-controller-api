@@ -43,7 +43,7 @@ numeric value from `0` to `6`. Missing or invalid values leave the current level
 unchanged and return `false`.
 
 ```bash
-XBOX_CONTROLLER_API_LOG_LEVEL=debug ./build/src/bin/example_program
+XBOX_CONTROLLER_API_LOG_LEVEL=debug ./build/src/bin/xbox_controller_monitor
 ```
 
 ## C++ usage
