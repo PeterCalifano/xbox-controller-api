@@ -81,7 +81,9 @@ doc/controller_api.md
 `src/wrapped_impl/CWrapperPlaceholder.h/.cpp`. (`wrapper_placeholder.i` stays — unreferenced example.)
 
 **Modified**: root `CMakeLists.txt`, `src/CMakeLists.txt`, `src/config.h.in`, `src/wrap_interface.i`,
-`src/bin/example_program.cpp`, `examples/xbox_controller_api_examples/example_build.cpp`,
+`src/bin/example_program.cpp`, `examples/xbox_controller_api_examples/example_build.cpp` (renamed to
+`example_scripted_replay.cpp` — the template excludes the historic `example_build` name from the
+build via `EXCLUDED_LIST`, which stays untouched by user decision),
 `examples/consumer_project/example_project.h/.cpp`, `ros2/xbox_controller_api/CMakeLists.txt`,
 `ros2/xbox_controller_api_ros/src/conversions.cpp`,
 `ros2/xbox_controller_api_ros/test/test_conversions.cpp`, `.github/workflows/build_linux.yml`,
