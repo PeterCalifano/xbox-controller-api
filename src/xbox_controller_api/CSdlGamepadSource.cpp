@@ -115,9 +115,11 @@ namespace xbox_controller_api
             // SDL reports stick Y as positive downward. The library contract is
             // up = +1, so the two Y axes, and only those, are inverted here.
             strState_.dLeftStickX_ = ReadStickAxis(objController, SDL_CONTROLLER_AXIS_LEFTX);
-            strState_.dLeftStickY_ = InvertAxis(ReadStickAxis(objController, SDL_CONTROLLER_AXIS_LEFTY));
+            strState_.dLeftStickY_ = InvertAxis(ReadStickAxis(objController,
+                                                             SDL_CONTROLLER_AXIS_LEFTY));
             strState_.dRightStickX_ = ReadStickAxis(objController, SDL_CONTROLLER_AXIS_RIGHTX);
-            strState_.dRightStickY_ = InvertAxis(ReadStickAxis(objController, SDL_CONTROLLER_AXIS_RIGHTY));
+            strState_.dRightStickY_ = InvertAxis(ReadStickAxis(objController,
+                                                              SDL_CONTROLLER_AXIS_RIGHTY));
 
             strState_.dLeftTrigger_ = ReadTriggerAxis(objController, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
             strState_.dRightTrigger_ = ReadTriggerAxis(objController, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
@@ -337,6 +339,15 @@ namespace xbox_controller_api
         // Poll rather than pump: SDL_GameControllerUpdate refreshes device state
         // without consuming events that a host application may own.
         SDL_GameControllerUpdate();
+
+        // The refresh above queues joystick and controller events that this
+        // instance never consumes, so a long session would otherwise fill the
+        // capped queue. Discarding them is only safe when we started the
+        // subsystem, i.e. nobody else owns the queue; it is a no-op when empty.
+        if (pImpl_->bStartedSubsystem_)
+        {
+            SDL_FlushEvents(SDL_JOYAXISMOTION, SDL_CONTROLLERSENSORUPDATE);
+        }
 
         // A detach is reported once and then left to the caller, since recovery
         // requires an explicit open(). Publishing and logging only on the
