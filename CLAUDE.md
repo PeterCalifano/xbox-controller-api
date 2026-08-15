@@ -8,15 +8,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 optional Python bindings (via gtwrap) and an optional ROS 2 overlay. It was
 derived from Pietro Califano's `cpp_cuda_template_project` CMake template.
 
-**The controller API itself is not implemented yet.** The library currently
-exposes placeholders that mark where real code goes:
+**The input API is implemented** (v1 is input only; no rumble or LED). See
+`doc/controller_api.md`. The layering, which changes must preserve:
 
-- `src/xbox_controller_api/placeholder.h` / `.cpp` — core library seam
-- `src/wrapped_impl/CWrapperPlaceholder.h` / `.cpp` — wrapper-facing facade
-- `ros2/xbox_controller_api_ros/src/conversions.cpp` — ROS core-call seam,
-  marked with `EDIT ME` comments
+- `SGamepadState.h` — normalized snapshot aggregate; sticks `[-1,1]` with
+  **Y positive up**, triggers `[0,1]`, plus sequence and timestamp counters
+- `CGamepadSource.h` — abstract poll-model base; private snapshot behind a
+  protected `setState()`, so a backend cannot publish a partial sample
+- `GamepadFilters.h` — pure scalar math; deliberately has **no dependency on
+  `SGamepadState`**
+- `GamepadControls.h` — snapshot-level operations and `EGamepadButton`, the
+  single authority for control identity, names and ordering
+- `CSdlGamepadSource.h/.cpp` — the only hardware-facing class; SDL types stay
+  behind a pimpl so the installed header has a layout independent of
+  `__SDL2_ENABLED__`
+- `CScriptedGamepadSource` — deterministic replay source for hardware-free tests
+- `src/wrapped_impl/CGamepadWrapper.*` — flat facade for the Python bindings
 
-Keep these seams compiling. Replacing them is the actual feature work.
+Backends apply no conditioning: deadzone and edge detection are explicit
+consumer decisions. A disconnect is reported, never healed — recovery requires
+an explicit `open()`.
 
 ## Build Commands
 
@@ -89,6 +100,15 @@ Targets export as `xbox_controller_api::xbox_controller_api`.
 - `ACHTUNG!` prefix in comments marks critical warnings
 - Sanitizer builds via `-DSANITIZE_BUILD=ON`
 - Logger env var is `XBOX_CONTROLLER_API_LOG_LEVEL`
+- `ENABLE_SDL2` defaults **ON**; a missing SDL2 warns and stubs the backend out
+  while keeping the full API surface. `ENABLE_SDL2_STRICT=ON` makes it a
+  configure error instead, and CI uses that. Gate downstream logic on the
+  resolved `SDL2_ENABLED`, never on the `ENABLE_SDL2` request
+- The ROS overlay forces `ENABLE_SDL2=OFF` and consumes only installed public
+  headers, so a header a ROS translation unit needs must be installed
+- Source discovery uses plain `file(GLOB ...)` without `CONFIGURE_DEPENDS`, so
+  **adding or deleting a source file needs a fresh configure**; an incremental
+  `./build_ros2.sh` will fail on a stale cached list until run with `--clean`
 
 ## Removed template features
 

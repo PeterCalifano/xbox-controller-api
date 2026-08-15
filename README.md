@@ -4,13 +4,14 @@ A C++ library for reading Xbox controller input, with optional Python bindings
 and ROS 2 integration. Shared builds are the default; static builds are
 selectable through the standard CMake `BUILD_SHARED_LIBS`.
 
-> **Status:** the build, packaging, wrapper, documentation, and CI machinery is
-> in place, but the controller API itself is not implemented yet. The library
-> currently exposes placeholder types (`placeholder.h`, `CWrapperPlaceholder`)
-> that mark where the real implementation goes.
+> **Status:** the input API is implemented. Reading an xpad-class controller
+> works from C++ and from Python, through an SDL2 backend that is optional at
+> build time. Version 1 is input only: rumble and LED control are not
+> implemented. See [`doc/controller_api.md`](doc/controller_api.md).
 
 ## Documentation Map
 
+- [`doc/controller_api.md`](doc/controller_api.md): controller setup on Linux, axis and button conventions, deadzones, disconnect handling, and both examples.
 - [`doc/cpp_build.md`](doc/cpp_build.md): C++ build modes, toolchains, and CPU tuning.
 - [`doc/wrappers.md`](doc/wrappers.md): gtwrap setup, Python package workflow, and wrapper docstrings.
 - [`doc/versioning.md`](doc/versioning.md): git tags, source/build/install `VERSION` files, C++ config macros, Python metadata, and packages.
@@ -34,6 +35,7 @@ See [`doc/ros2_overlay.md`](doc/ros2_overlay.md) for the optional ROS 2 overlay 
 | CMake | ≥ 3.15 | |
 | C++ compiler | C++20 | GCC 11+, Clang 13+ |
 | Eigen3 | ≥ 3.4 | Required |
+| SDL2 | ≥ 2.0.9 | Optional but ON by default; provides the controller backend (`libsdl2-dev`) |
 | oneTBB | any | Optional (`-DENABLE_TBB=ON`) |
 | Catch2 | 3.x | Auto-fetched from GitHub if not found |
 | pytest | any | Required when `ENABLE_PYTHON_TESTS=ON` and `test*.py` files are present |
@@ -156,6 +158,8 @@ ignored with `--rebuild-only`.
 | `xbox_controller_api_METADATA_ONLY` | OFF | Configure project identity/version without compiler languages |
 | `ENABLE_TBB` | OFF | Intel oneTBB support (`find_package(TBB)`) |
 | `ENABLE_OPENGL` | OFF | OpenGL support |
+| `ENABLE_SDL2` | ON | SDL2-backed controller input. When SDL2 is missing the build warns and the backend is stubbed out, keeping the full API surface |
+| `ENABLE_SDL2_STRICT` | OFF | Turn a missing SDL2 into a configure error instead of a warning; used by CI |
 | `ENABLE_TESTS` | ON | Register and run CTest tests |
 | `CATCH2_TEST_REPORTER` | `compact` | Catch2 reporter passed through `catch_discover_tests` |
 | `CATCH2_TEST_PROPERTIES` | `LABELS;catch2` | CTest property name/value pairs for discovered Catch2 tests |

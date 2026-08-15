@@ -1,6 +1,8 @@
 # Xbox 360 / xpad-class Controller Input — Implementation Plan
 
-Status: approved design (2026-08-14). Batch 1 implemented; batches 2-6 pending.
+Status: **implemented and verified (2026-08-15)**. All six planned batches landed, plus one batch
+added during implementation. See [Implementation record](#implementation-record) for the
+batch-to-commit mapping, the deviations from this plan, and the outstanding follow-ups.
 
 ## Context
 
@@ -195,14 +197,15 @@ all public API, `[[nodiscard]]`/`noexcept`, namespace `xbox_controller_api`.
 Each batch leaves everything compiling; the repository batch workflow applies (no commits without
 explicit authorization, no Conventional-Commits prefixes, no AI trailers).
 
-| # | Batch | Verification |
-|---|-------|--------------|
-| 1 | Pure core: SGamepadState, CGamepadSource, GamepadFilters, CScriptedGamepadSource + their 3 test files | `./build_lib.sh` + `ctest --test-dir build --output-on-failure` |
-| 2 | CMake SDL2 plumbing (HandleSDL2, root, src/, config.h.in, ROS shim force-OFF) | `./build_lib.sh` (log shows SDL2 ON); `-DENABLE_SDL2=OFF` configure+build; `./build_ros2.sh` |
-| 3 | SDL backend (CSdlGamepadSource + testSdlGamepadSource) | both ON and OFF builds + ctest green; optional manual pad smoke |
-| 4 | Examples/bin/consumer rewrite + example_read_controller (50 Hz poll, edge-printed buttons, bounded runtime, quit-on-Start, graceful no-pad) | `./build_lib.sh`; run example with/without pad |
-| 5 | Wrapper: CGamepadWrapper, wrap_interface.i, Python sample, pytest | `./build_lib.sh -p`; `ctest -L python`; run Python sample |
-| 6 | Seam retirement (conversions retarget + ROS test values, delete placeholders), docs, CI | `./build_lib.sh && ./build_lib.sh -p && ./build_ros2.sh`; grep confirms no load-bearing "placeholder" |
+| # | Batch | Verification | Status |
+|---|-------|--------------|--------|
+| 1 | Pure core: SGamepadState, CGamepadSource, GamepadFilters, CScriptedGamepadSource + their 3 test files | `./build_lib.sh` + `ctest --test-dir build --output-on-failure` | done — `ed7c959` |
+| 2 | CMake SDL2 plumbing (HandleSDL2, root, src/, config.h.in, ROS shim force-OFF) | `./build_lib.sh` (log shows SDL2 ON); `-DENABLE_SDL2=OFF` configure+build; `./build_ros2.sh` | done — `cdfa00a` |
+| 3 | SDL backend (CSdlGamepadSource + testSdlGamepadSource) | both ON and OFF builds + ctest green; optional manual pad smoke | done — `943691f` |
+| 4 | Examples/bin/consumer rewrite + example_read_controller (50 Hz poll, edge-printed buttons, bounded runtime, quit-on-Start, graceful no-pad) | `./build_lib.sh`; run example with/without pad | done — `26665d8`, `b098e00` |
+| 5 | Wrapper: CGamepadWrapper, wrap_interface.i, Python sample, pytest | `./build_lib.sh -p`; `ctest -L python`; run Python sample | done — `c5061e7` |
+| 5b | **Added during implementation.** Control identity API (GamepadControls) + removal of three duplicated control tables | `./build_lib.sh -p`; ON and OFF builds; `./build_ros2.sh` | done — `b5aaf68` |
+| 6 | Seam retirement (conversions retarget + ROS test values, delete placeholders), docs, CI | `./build_lib.sh && ./build_lib.sh -p && ./build_ros2.sh`; grep confirms no load-bearing "placeholder" | done — staged, awaiting commit |
 
 ## Repo-specific hazards to respect during implementation
 
@@ -215,3 +218,71 @@ explicit authorization, no Conventional-Commits prefixes, no AI trailers).
   source-tree include path.
 - AGENTS.md governs commits: imperative subjects, bullet bodies with blank lines, optional
   `[MAJOR]` tag, **never** Co-Authored-By trailers; staging/commit only on explicit authorization.
+
+## Implementation record
+
+Completed on `feature/implement-first-prototype`, 2026-08-15. This section records what actually
+happened, so the plan above stays readable as the original design rather than being rewritten.
+
+### Deviations from the plan, with rationale
+
+1. **`-Wfloat-equal` was missing from the hazard list.** It sits in the same `_safety_warnings`
+   group as `-Wconversion` (`cmake/HandleCompilerFlags.cmake:42`) and is equally active by default,
+   which makes `REQUIRE(x == 1.0)` unusable. Every floating-point assertion goes through Catch2's
+   `WithinAbs(expected, tolerance)`, with a zero tolerance where bit-exactness is the requirement.
+2. **SDL2 export safety.** The plan's unconditional `list(APPEND EXPORT_TARGET_DEPS SDL2)` combined
+   with a `pkg_check_modules(... IMPORTED_TARGET sdl2)` fallback would have broken installed
+   consumers: `PkgConfig::SDL2_PC` cannot be recreated by `find_dependency(SDL2)`. The fallback
+   branch links the resolved flags instead, and `SDL2` is advertised only when discovery went
+   through `find_package(SDL2 CONFIG)`. Verified by installing the fallback build and confirming the
+   exported target file carries a concrete `libSDL2.so` path and zero `PkgConfig::` references.
+3. **`SDL2_ENABLED` is the single downstream authority**, mirroring the `ENABLE_ZEROMQ`/
+   `ZEROMQ_ENABLED` precedent: `ENABLE_SDL2` stays the request, `SDL2_ENABLED` the resolved outcome.
+   Nothing force-writes the cache, so installing `libsdl2-dev` later is picked up on reconfigure.
+4. **Batch 5b was added.** Three copies of the control mapping had accumulated (C++ example, the
+   monitor, the Python example). `GamepadControls.h/.cpp` now owns `EGamepadButton`,
+   `AllGamepadButtons`, `GetButton`, `GetGamepadButtonName`, a snapshot overload of
+   `ClassifyButtonEdge`, and `ApplyStickDeadzone`. It is a new header rather than an addition to
+   `GamepadFilters.h`, which deliberately keeps no dependency on `SGamepadState`.
+5. **`example_build.cpp` renamed to `example_scripted_replay.cpp`.** The old name was matched by
+   `examples/CMakeLists.txt`'s `EXCLUDED_LIST "example_build"`, so that example had never been
+   compiled. The rename also makes it a real, verified build target.
+6. **`example_program.cpp` renamed to `xbox_controller_monitor.cpp`** and reshaped from a one-shot
+   probe into an installed live diagnostic: 50 Hz paced polling, report-on-change with a heartbeat,
+   raw unconditioned values so drift stays visible, and `sigaction`-based SIGINT/SIGTERM shutdown.
+7. **`CGamepadWrapper` caches one conditioned snapshot per poll** instead of re-running the deadzone
+   inside every accessor, and gained indexed accessors (`buttonCount`, `buttonName`,
+   `buttonPressed`) so a script can iterate controls generically.
+8. **The ROS contract change reached further than the plan predicted.** Besides
+   `test_conversions.cpp`, the launch integration test `test_spinup_launch.py` also asserted the old
+   `multiplyBy2` result; it produced 5 failures until its request/response values were moved
+   in-domain (input `-0.25` with the configured gain 2.0 and bias 1.0 yields exactly 0.5).
+9. **`CSdlGamepadSource::update()` flushes queued joystick and controller events.** The poll-only
+   contract removes the obligation to read the SDL event queue but not the consequence of
+   generating entries in it, and that queue is capped.
+
+### Verification performed
+
+| Command | Result |
+|---|---|
+| `./build_lib.sh -p` | 37/37 tests, zero warnings under `-Wall -Wextra -Wpedantic -Wconversion -Wfloat-equal -Wnon-virtual-dtor -Wnull-dereference -Wsuggest-override` |
+| `-DENABLE_SDL2=OFF` build (+ wrapper) | 37/37 tests, zero warnings; `open()` false with the fixed diagnostic; getters at rest |
+| `ENABLE_SDL2_STRICT` matrix | available → ON; hidden + strict → configure error, exit 1; hidden + non-strict → warning and stub |
+| pkg-config fallback install | export self-contained, `find_dependency` free of SDL2 |
+| `./build_ros2.sh` | 4 packages, 11 tests, 0 failures |
+| Fresh install + consumer project | builds warning-free against the installed package and runs |
+| Live hardware | SDL reports "X360 Controller" at index 0; C++ and Python samples produce identical output at a measured 50 Hz |
+
+### Outstanding follow-ups
+
+- `examples/CMakeLists.txt:3` still sets `EXCLUDED_LIST "example_build"`, which after the rename
+  matches no file. Dead configuration, and a trap if that filename ever returns.
+- Source discovery uses plain `file(GLOB ...)` without `CONFIGURE_DEPENDS`, so adding or removing a
+  source file requires a fresh configure. An incremental `./build_ros2.sh` fails on the stale cached
+  list until it is run with `--clean`; this bit the placeholder deletion in batch 6.
+- Pre-existing and untouched: `CMakeLists.txt` appends `OpenGL::GL` to `EXPORT_TARGET_DEPS`, which
+  becomes `find_dependency(OpenGL::GL)` — not a package name. Latent until `ENABLE_OPENGL=ON`.
+- `install/` is not pruned by `cmake --install`, so a stale tree can retain headers that are no
+  longer produced. Remove the directory before trusting an installed-header listing.
+- Deferred to v2 as designed: rumble and LED output, multi-pad enumeration beyond an explicit index,
+  and ROS or viewer feature work.

@@ -3,10 +3,10 @@
 A C++ library for reading Xbox controller input, with optional Python bindings
 and ROS 2 integration.
 
-@note The controller API itself is not implemented yet. The library currently
-exposes placeholder types (`placeholder.h`, `CWrapperPlaceholder`) that mark
-where the real implementation goes. The build, packaging, wrapper,
-documentation, and CI machinery around them is complete.
+@note The input API is implemented and reads xpad-class controllers through an
+optional SDL2 backend, from C++ and from Python. Version 1 is input only:
+rumble and LED control are not implemented. See @ref doc/controller_api.md for
+setup, conventions, and examples.
 
 See the [README](README.md) for the quick start, then use the focused guides below:
 
@@ -72,7 +72,7 @@ The optional overlay in `ros2/` builds separately:
 ./build_ros2.sh --clean
 ```
 
-The core-call seam lives in `ros2/xbox_controller_api_ros/src/conversions.cpp`,
-marked with `EDIT ME` comments. It currently calls the placeholder so the
-overlay keeps building; swap it for the real entry point when the library gains
-one.
+The core-call seam lives in `ros2/xbox_controller_api_ros/src/conversions.cpp`.
+It calls the library's axis conditioning through the installed public header
+`<xbox_controller_api/GamepadFilters.h>`, which is what keeps the overlay
+dependent on the exported package rather than on the source tree.

@@ -64,7 +64,7 @@ jobs:
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.runner == 'github-hosted' }}
         run: |
           sudo apt update
-          sudo apt install -y cmake ninja-build g++ ccache libboost-all-dev libeigen3-dev libtbb-dev python3-dev python3-pytest
+          sudo apt install -y cmake ninja-build g++ ccache libboost-all-dev libeigen3-dev libsdl2-dev libtbb-dev python3-dev python3-pytest
 
       - name: Validate self-hosted prerequisites
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'self-hosted' }}
@@ -92,6 +92,8 @@ jobs:
             -DENABLE_TESTS=ON \
             -DENABLE_TBB="${ENABLE_TBB}" \
             -DENABLE_OPENGL=OFF \
+            -DENABLE_SDL2=ON \
+            -DENABLE_SDL2_STRICT=ON \
             -DCPU_ENABLE_NATIVE_TUNING=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -126,7 +128,7 @@ jobs:
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.runner == 'github-hosted' }}
         run: |
           sudo apt update
-          sudo apt install -y cmake ninja-build g++ libboost-all-dev libeigen3-dev libtbb-dev python3-dev python3-pytest
+          sudo apt install -y cmake ninja-build g++ libboost-all-dev libeigen3-dev libsdl2-dev libtbb-dev python3-dev python3-pytest
 
       - name: Validate self-hosted prerequisites
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'self-hosted' }}
