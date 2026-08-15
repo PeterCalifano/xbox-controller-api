@@ -22,7 +22,17 @@ selectable through the standard CMake `BUILD_SHARED_LIBS`.
 
 ## Optional ROS 2 Overlay
 
-See [`doc/ros2_overlay.md`](doc/ros2_overlay.md) for the optional ROS 2 overlay architecture, build flow, CI, rollout, and removal policy.
+The overlay publishes an attached controller as the standard `sensor_msgs/msg/Joy` on `~/joy`, so
+`teleop_twist_joy`, `joy_teleop`, rqt tooling and rosbag work without any glue. It requires
+`libsdl2-dev`. See [`doc/ros2_overlay.md`](doc/ros2_overlay.md) for the architecture, build flow,
+CI, rollout, and removal policy.
+
+```bash
+./build_ros2.sh
+source ros2/install/setup.bash
+ros2 launch xbox_controller_api_spinup xbox_controller_api.launch.py
+ros2 topic echo /xbox_controller/joy
+```
 
 - `./build_lib.sh`: C++-first library entry point; it never needs ROS.
 - `./build_ros2.sh`: optional ROS 2 overlay build and test entry point.

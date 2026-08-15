@@ -104,8 +104,11 @@ Targets export as `xbox_controller_api::xbox_controller_api`.
   while keeping the full API surface. `ENABLE_SDL2_STRICT=ON` makes it a
   configure error instead, and CI uses that. Gate downstream logic on the
   resolved `SDL2_ENABLED`, never on the `ENABLE_SDL2` request
-- The ROS overlay forces `ENABLE_SDL2=OFF` and consumes only installed public
-  headers, so a header a ROS translation unit needs must be installed
+- The ROS overlay forces `ENABLE_SDL2=ON` **and** `ENABLE_SDL2_STRICT=ON`: it
+  publishes real controller data, so a missing libsdl2-dev must fail the build
+  rather than yield a node that can never open a device. The overlay consumes
+  only installed public headers, so a header a ROS translation unit needs must
+  be installed
 - Source discovery uses plain `file(GLOB ...)` without `CONFIGURE_DEPENDS`, so
   **adding or deleting a source file needs a fresh configure**; an incremental
   `./build_ros2.sh` will fail on a stale cached list until run with `--clean`

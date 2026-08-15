@@ -242,18 +242,20 @@ def _PackageRoles(packageNames_: frozenset[str]) -> dict[str, PackageRole]:
         # Output:
         # BRIDGE
     """
+    # The bridge and spinup packages are what identify an overlay. A dedicated
+    # interfaces package is optional, since an overlay that publishes only
+    # standard messages does not define any of its own.
     prefixCandidates_ = [
         name_
         for name_ in packageNames_
         if {
-            f"{name_}_interfaces",
             f"{name_}_ros",
             f"{name_}_spinup",
         }.issubset(packageNames_)
     ]
     if len(prefixCandidates_) != 1:
         raise ValueError(
-            "Could not identify one ROS overlay package quartet from package names: "
+            "Could not identify one ROS overlay package set from package names: "
             + ", ".join(sorted(packageNames_))
         )
 

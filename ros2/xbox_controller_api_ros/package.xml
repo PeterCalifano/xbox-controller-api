@@ -15,7 +15,7 @@
   <depend>rclcpp_lifecycle</depend>
   <depend>lifecycle_msgs</depend>
   <depend>xbox_controller_api</depend>
-  <depend>xbox_controller_api_interfaces</depend>
+  <depend>sensor_msgs</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
 

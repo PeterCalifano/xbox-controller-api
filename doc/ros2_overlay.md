@@ -27,11 +27,12 @@ The overlay packages are:
 | Package | Role |
 |---|---|
 | `xbox_controller_api` | Plain CMake shim around the core library. |
-| `xbox_controller_api_interfaces` | ROS messages and services. |
-| `xbox_controller_api_ros` | Bridge package with conversions, lifecycle node, component, executable, and tests. |
+| `xbox_controller_api_ros` | Bridge package with the Joy conversion, lifecycle node, component, executable, and tests. |
 | `xbox_controller_api_spinup` | Launch files and default node configuration. |
 
-The `xbox_controller_api_ros` package keeps a conversions-vs-node split. `xbox_controller_api_ros_conversions` links the core library and interfaces but does not depend on `rclcpp`; it is safe to test without a ROS executor. `xbox_controller_api_ros_component` owns lifecycle, parameters, publishers, services, and component registration.
+There is no interfaces package: the overlay publishes the standard `sensor_msgs/msg/Joy` and defines no messages of its own.
+
+The `xbox_controller_api_ros` package keeps a conversion-vs-node split. `xbox_controller_api_ros_joy_conversion` links the core library and `sensor_msgs` but does not depend on `rclcpp`; it is safe to test without a ROS executor. `xbox_controller_api_ros_component` owns lifecycle, parameters, the publisher, the poll timer, and component registration.
 
 Core C++ unit tests remain Catch2-based. ROS package tests use
 `ament_cmake_gtest` as the narrow ROS-specific exception so ament registers and
@@ -117,17 +118,40 @@ described in [Release tagging with the ROS 2 overlay](versioning.md#release-tagg
 
 ## Adaptation seam
 
-The primary adaptation seam is:
+The overlay publishes an attached controller as the standard
+`sensor_msgs/msg/Joy` on `~/joy`, which is what lets `teleop_twist_joy`,
+`joy_teleop`, rqt tooling and rosbag consume it without any glue.
+
+Two files carry the adaptation:
 
 ```text
-ros2/xbox_controller_api_ros/src/conversions.cpp
+ros2/xbox_controller_api_ros/src/joy_conversion.cpp
+ros2/xbox_controller_api_ros/src/CXboxControllerLifecycleNode.cpp
 ```
 
-Update the fenced include and the `EvaluateTemplateCore` body to call the real
-library API. It currently calls the placeholder so the overlay keeps building.
-Review `ros2/xbox_controller_api_ros/src/CXboxControllerLifecycleNode.cpp` only
-when ROS node wiring, parameters, publishers, or services also need to change.
-Then run `./build_ros2.sh --clean`.
+`joy_conversion.cpp` turns an `SGamepadState` into a `Joy` message and is
+deliberately free of rclcpp, so it stays unit testable without a ROS context or
+a controller. It leaves the header stamp unset, because snapshot timestamps come
+from a steady clock with an arbitrary epoch and only the node can supply a ROS
+time.
+
+`CXboxControllerLifecycleNode.cpp` owns the device and the poll timer. Its
+lifecycle states map onto the library's explicit device contract: configure
+allocates the publisher without touching hardware, activate opens the device and
+fails when none is available, and deactivate closes it. A detach stops
+publication rather than reconnecting, so a deactivate/activate cycle is the
+documented recovery.
+
+Everything is consumed through installed public headers, so the overlay
+exercises the exported package rather than the source tree. Any new header a ROS
+translation unit needs must therefore be installed, not merely present under
+`src/`. The overlay forces `ENABLE_SDL2=ON` and `ENABLE_SDL2_STRICT=ON`, since a
+node that publishes controller data has no use for a stubbed backend; that makes
+`libsdl2-dev` a build requirement for the overlay.
+
+After changing any of this, run `./build_ros2.sh --clean`. A plain incremental
+build reuses a cached source list, because the core's source globs do not use
+`CONFIGURE_DEPENDS`.
 
 ## Removal
 

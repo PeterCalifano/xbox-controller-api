@@ -276,8 +276,40 @@ rather than on a preprocessor symbol:
 `XBOX_CONTROLLER_API_HAS_SDL2` is defined in the generated `config.h` when the
 backend was compiled in.
 
-The ROS 2 overlay forces `ENABLE_SDL2=OFF`, so the overlay never depends on
-SDL2.
+The ROS 2 overlay is the exception: it forces `ENABLE_SDL2=ON` and
+`ENABLE_SDL2_STRICT=ON`, because a node that publishes controller data has no
+use for a stubbed backend.
+
+## ROS 2
+
+The overlay publishes the standard `sensor_msgs/msg/Joy` on `~/joy`, so
+`teleop_twist_joy`, `joy_teleop`, rqt tooling and rosbag work without glue.
+
+```bash
+./build_ros2.sh
+source ros2/install/setup.bash
+ros2 launch xbox_controller_api_spinup xbox_controller_api.launch.py
+ros2 topic echo /xbox_controller/joy
+```
+
+Axis order is `[LeftStickX, LeftStickY, RightStickX, RightStickY, LeftTrigger,
+RightTrigger]`, carrying the library conventions rather than the raw SDL ones,
+so stick Y is positive upward. Buttons follow `AllGamepadButtons()` order, which
+is the same stable contract documented above.
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `joystick_index` | `-1` | Device to open; negative selects the lowest-numbered game controller |
+| `publish_rate_hz` | `50.0` | Poll and publish rate, accepted in `[1, 1000]` |
+| `stick_deadzone` | `0.0` | Deadzone applied to sticks before publishing |
+| `frame_id` | `xbox_controller` | Frame id placed in the message header |
+
+The node is a lifecycle node, and its states map onto the device contract:
+`on_configure` reads parameters and creates the publisher without touching
+hardware; `on_activate` opens the device and starts the timer, **failing when no
+controller is available**; `on_deactivate` stops the timer and closes the
+device. A detach publishes the neutral snapshot once, stops publication, and
+logs — recovery is a deactivate/activate cycle, never an automatic reconnect.
 
 ## Testing without hardware
 

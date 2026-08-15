@@ -1,3 +1,11 @@
+"""Launch-level checks that the overlay starts and publishes controller data.
+
+Nothing here asserts that a controller is attached. Activation legitimately
+fails on a machine with no device, so each launch path is required to settle in
+a defined lifecycle state, and the Joy contract is checked only when the node
+actually reached the active state.
+"""
+
 import time
 import unittest
 
@@ -13,8 +21,11 @@ from lifecycle_msgs.srv import GetState
 import pytest
 import rclpy
 from rclpy.node import Node
-from xbox_controller_api_interfaces.msg import AlgorithmStatus
-from xbox_controller_api_interfaces.srv import RunAlgorithm
+from sensor_msgs.msg import Joy
+
+# Axis and button counts published by the node, mirroring the C++ contract.
+EXPECTED_AXIS_COUNT = 6
+EXPECTED_BUTTON_COUNT = 15
 
 
 @pytest.mark.launch_test
@@ -64,12 +75,18 @@ class TestSpinupLaunch(unittest.TestCase):
         cls.objNode_.destroy_node()
         rclpy.shutdown()
 
-    def _waitForActive(
+    def _waitForSettledState(
         self,
         charNodePath_: str,
         charCase_: str,
         dTimeoutSec_: float = 10.0,
-    ) -> None:
+    ) -> int:
+        """Return the lifecycle state the node settles in.
+
+        Autostart drives configure and then activate. Activation fails when no
+        controller is present, which leaves the node inactive rather than
+        active, so both outcomes are accepted and returned to the caller.
+        """
         objStateClient_ = self.objNode_.create_client(
             GetState,
             f"{charNodePath_}/get_state",
@@ -89,15 +106,18 @@ class TestSpinupLaunch(unittest.TestCase):
                 self.assertIsNotNone(objResponse_)
                 uiLastState_ = objResponse_.current_state.id
                 if uiLastState_ == State.PRIMARY_STATE_ACTIVE:
-                    return
+                    return uiLastState_
             time.sleep(0.1)
 
-        self.fail(
-            f"Lifecycle node did not become active for {charCase_}; "
-            f"last state was {uiLastState_}"
+        self.assertEqual(
+            uiLastState_,
+            State.PRIMARY_STATE_INACTIVE,
+            f"Node settled in an unexpected state for {charCase_}; got {uiLastState_}",
         )
 
-    def testLaunchPathIsActiveAndServesAlgorithm(
+        return uiLastState_
+
+    def testLaunchPathSettlesAndPublishesJoyWhenActive(
         self,
         charLaunchFile_: str,
         charNamespace_: str,
@@ -105,74 +125,46 @@ class TestSpinupLaunch(unittest.TestCase):
         charNamespacePrefix_ = f"/{charNamespace_}" if charNamespace_ else ""
         charNodePath_ = f"{charNamespacePrefix_}/xbox_controller"
         charCase_ = f"launch={charLaunchFile_}, namespace={charNamespace_ or '<root>'}"
-        self._waitForActive(charNodePath_, charCase_)
 
-        objAlgorithmClient_ = self.objNode_.create_client(
-            RunAlgorithm,
-            f"{charNodePath_}/run_algorithm",
-        )
-        self.assertTrue(
-            objAlgorithmClient_.wait_for_service(timeout_sec=5.0),
-            f"Algorithm service was unavailable for {charCase_}",
-        )
+        uiState_ = self._waitForSettledState(charNodePath_, charCase_)
 
-        listStatusMessages_: list[AlgorithmStatus] = []
-        objStatusSubscription_ = self.objNode_.create_subscription(
-            AlgorithmStatus,
-            f"{charNodePath_}/status",
-            listStatusMessages_.append,
+        if uiState_ != State.PRIMARY_STATE_ACTIVE:
+            # No controller on this machine: the launch path is still proven to
+            # come up and configure, which is what this test can guarantee.
+            self.skipTest(f"Node is inactive, so no controller is attached for {charCase_}")
+
+        listJoyMessages_: list[Joy] = []
+        objJoySubscription_ = self.objNode_.create_subscription(
+            Joy,
+            f"{charNodePath_}/joy",
+            listJoyMessages_.append,
             10,
         )
         try:
-            dDiscoveryDeadline_ = time.monotonic() + 5.0
-            while (
-                objStatusSubscription_.get_publisher_count() == 0
-                and time.monotonic() < dDiscoveryDeadline_
-            ):
-                rclpy.spin_once(self.objNode_, timeout_sec=0.1)
-            self.assertGreater(
-                objStatusSubscription_.get_publisher_count(),
-                0,
-                f"Status publisher was undiscovered for {charCase_}",
-            )
-
-            # Subscriber-side graph visibility can precede publisher-side endpoint matching.
-            dDiscoverySettleDeadline_ = time.monotonic() + 0.5
-            while time.monotonic() < dDiscoverySettleDeadline_:
-                rclpy.spin_once(self.objNode_, timeout_sec=0.05)
-
-            objRequest_ = RunAlgorithm.Request()
-            objRequest_.input = 3.0
-            objFuture_ = objAlgorithmClient_.call_async(objRequest_)
-            dResponseDeadline_ = time.monotonic() + 5.0
-            while (
-                (not objFuture_.done() or not listStatusMessages_)
-                and time.monotonic() < dResponseDeadline_
-            ):
+            dDeadline_ = time.monotonic() + 5.0
+            while not listJoyMessages_ and time.monotonic() < dDeadline_:
                 rclpy.spin_once(self.objNode_, timeout_sec=0.1)
 
-            self.assertTrue(
-                objFuture_.done(),
-                f"Algorithm response timed out for {charCase_}",
-            )
-            self.assertTrue(
-                listStatusMessages_,
-                f"Status publication timed out for {charCase_}",
-            )
-            self.assertIsNone(objFuture_.exception(), charCase_)
-            objResponse_ = objFuture_.result()
-            self.assertIsNotNone(objResponse_, charCase_)
-            self.assertEqual(objResponse_.output, 14.0, charCase_)
-            self.assertEqual(objResponse_.status, "ok", charCase_)
+            self.assertTrue(listJoyMessages_, f"No Joy message arrived for {charCase_}")
 
-            objStatus_ = listStatusMessages_[-1]
-            self.assertEqual(objStatus_.last_input, 3.0, charCase_)
-            self.assertEqual(objStatus_.last_output, 14.0, charCase_)
-            self.assertEqual(objStatus_.evaluation_count, 1, charCase_)
-            self.assertEqual(objStatus_.state, "ok", charCase_)
+            objJoy_ = listJoyMessages_[-1]
+            self.assertEqual(len(objJoy_.axes), EXPECTED_AXIS_COUNT, charCase_)
+            self.assertEqual(len(objJoy_.buttons), EXPECTED_BUTTON_COUNT, charCase_)
+            self.assertEqual(objJoy_.header.frame_id, "xbox_controller", charCase_)
             self.assertTrue(
-                objStatus_.stamp.sec > 0 or objStatus_.stamp.nanosec > 0,
-                f"Status timestamp was not populated for {charCase_}",
+                objJoy_.header.stamp.sec > 0 or objJoy_.header.stamp.nanosec > 0,
+                f"Joy stamp was not populated for {charCase_}",
             )
+
+            # Values must satisfy the documented normalized ranges whatever the
+            # sticks happen to be doing while the test runs.
+            for dAxis_ in objJoy_.axes[:4]:
+                self.assertGreaterEqual(dAxis_, -1.0, charCase_)
+                self.assertLessEqual(dAxis_, 1.0, charCase_)
+            for dTrigger_ in objJoy_.axes[4:]:
+                self.assertGreaterEqual(dTrigger_, 0.0, charCase_)
+                self.assertLessEqual(dTrigger_, 1.0, charCase_)
+            for iButton_ in objJoy_.buttons:
+                self.assertIn(iButton_, (0, 1), charCase_)
         finally:
-            self.objNode_.destroy_subscription(objStatusSubscription_)
+            self.objNode_.destroy_subscription(objJoySubscription_)

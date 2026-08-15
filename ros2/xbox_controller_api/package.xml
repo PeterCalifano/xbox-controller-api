@@ -10,6 +10,7 @@
 
   <buildtool_depend>cmake</buildtool_depend>
   <depend>eigen</depend>
+  <depend>libsdl2-dev</depend>
 
   <export>
     <build_type>cmake</build_type>

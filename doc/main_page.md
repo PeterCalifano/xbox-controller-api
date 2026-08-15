@@ -72,7 +72,8 @@ The optional overlay in `ros2/` builds separately:
 ./build_ros2.sh --clean
 ```
 
-The core-call seam lives in `ros2/xbox_controller_api_ros/src/conversions.cpp`.
-It calls the library's axis conditioning through the installed public header
-`<xbox_controller_api/GamepadFilters.h>`, which is what keeps the overlay
-dependent on the exported package rather than on the source tree.
+The overlay publishes an attached controller as the standard
+`sensor_msgs/msg/Joy` on `~/joy`, from a lifecycle node that opens the device on
+activation and closes it on deactivation. The snapshot-to-message conversion
+lives in `ros2/xbox_controller_api_ros/src/joy_conversion.cpp` and is free of
+rclcpp so it stays testable without a ROS context.

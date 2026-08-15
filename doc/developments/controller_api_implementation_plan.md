@@ -206,6 +206,7 @@ explicit authorization, no Conventional-Commits prefixes, no AI trailers).
 | 5 | Wrapper: CGamepadWrapper, wrap_interface.i, Python sample, pytest | `./build_lib.sh -p`; `ctest -L python`; run Python sample | done — `c5061e7` |
 | 5b | **Added during implementation.** Control identity API (GamepadControls) + removal of three duplicated control tables | `./build_lib.sh -p`; ON and OFF builds; `./build_ros2.sh` | done — `b5aaf68` |
 | 6 | Seam retirement (conversions retarget + ROS test values, delete placeholders), docs, CI | `./build_lib.sh && ./build_lib.sh -p && ./build_ros2.sh`; grep confirms no load-bearing "placeholder" | done — staged, awaiting commit |
+| 7 | **Added during implementation.** Replace the template ROS overlay with a real `sensor_msgs/Joy` publisher; delete the interfaces package | `./build_ros2.sh --clean`; live `ros2 topic echo` | done — staged, awaiting commit |
 
 ## Repo-specific hazards to respect during implementation
 
@@ -260,6 +261,21 @@ happened, so the plan above stays readable as the original design rather than be
 9. **`CSdlGamepadSource::update()` flushes queued joystick and controller events.** The poll-only
    contract removes the obligation to read the SDL event queue but not the consequence of
    generating entries in it, and that queue is capped.
+10. **Batch 7 reversed the plan's "no ROS features" scoping.** The plan deliberately left the
+    overlay as template scaffolding that merely kept compiling. That left a `RunAlgorithm(float64)`
+    service and an `AlgorithmStatus` message advertising a contract nobody wants, so the overlay was
+    replaced with a real `sensor_msgs/msg/Joy` publisher and `xbox_controller_api_interfaces` was
+    deleted outright. `sensor_msgs/Joy` was chosen over a custom message because it is what the
+    existing ROS joystick ecosystem consumes. Consequences: the shim now forces `ENABLE_SDL2=ON`
+    and `ENABLE_SDL2_STRICT=ON` instead of OFF, `libsdl2-dev` became an overlay build requirement,
+    and the overlay CI installs it.
+11. **The Joy publisher uses default reliable QoS, not `SensorDataQoS`.** Sensor-data QoS is best
+    effort and therefore will not match the reliable subscriptions used by `teleop_twist_joy` and
+    most existing joystick consumers, which would have defeated the reason for publishing Joy at
+    all. The standard `joy` node publishes reliable, and this matches it.
+12. **`ros2/tools/sync_package_metadata.py` no longer requires an interfaces package.** Overlay
+    detection now keys on the bridge and spinup packages, since an overlay publishing only standard
+    messages defines no interfaces of its own.
 
 ### Verification performed
 
