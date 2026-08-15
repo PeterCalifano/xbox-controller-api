@@ -12,8 +12,6 @@ ROS_DISTRO_NAME="${ROS_DISTRO:-jazzy}"
 build_type="RelWithDebInfo"
 clean=false
 skip_tests=false
-enable_cuda=false
-enable_optix=false
 metadata_sync=true
 packages_select=()
 cmake_args=()
@@ -40,8 +38,6 @@ Options:
   --relwithdebinfo           Use CMAKE_BUILD_TYPE=RelWithDebInfo (default).
   --build-type <type>        Use an explicit CMake build type.
   --packages-select <pkg...> Build/test selected packages.
-  --cuda                     Enable core CUDA support.
-  --optix                    Enable core OptiX support; implies --cuda.
   --cmake-arg <arg>          Append one CMake argument. Repeatable.
   --colcon-arg <arg>         Append one colcon build argument. Repeatable.
   --no-version-sync          Do not synchronize ROS 2 package metadata (legacy flag name).
@@ -49,8 +45,8 @@ Options:
 
 Examples:
   ./build_ros2.sh --clean
-  ./build_ros2.sh --packages-select template_project template_project_interfaces
-  ./build_ros2.sh --cuda --cmake-arg -DCMAKE_CUDA_ARCHITECTURES=87
+  ./build_ros2.sh --packages-select xbox_controller_api xbox_controller_api_interfaces
+  ./build_ros2.sh --cmake-arg -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 EOF
 }
 
@@ -89,15 +85,6 @@ parse_args() {
           packages_select+=("$1")
           shift
         done
-        ;;
-      --cuda)
-        enable_cuda=true
-        shift
-        ;;
-      --optix)
-        enable_optix=true
-        enable_cuda=true
-        shift
         ;;
       --cmake-arg)
         [[ $# -ge 2 ]] || die "--cmake-arg requires a value"
@@ -144,7 +131,7 @@ touch_root_colcon_ignore_markers() {
   local path_
 
   shopt -s nullglob
-  for path_ in "${ROOT_DIR}"/build* "${ROOT_DIR}"/install "${ROOT_DIR}"/template_subbuild; do
+  for path_ in "${ROOT_DIR}"/build* "${ROOT_DIR}"/install "${ROOT_DIR}"/xbox_controller_api_subbuild; do
     [[ -d "${path_}" ]] || continue
     if touch "${path_}/COLCON_IGNORE" 2>/dev/null; then
       info "ensured COLCON_IGNORE in ${path_#"${ROOT_DIR}"/}"
@@ -178,16 +165,9 @@ sync_ros2_package_metadata() {
 }
 
 run_colcon_build() {
-  local cuda_flag_
-  local optix_flag_
   local build_cmd_
   local package_
   local test_cmd_
-
-  cuda_flag_="OFF"
-  optix_flag_="OFF"
-  [[ "${enable_cuda}" == true ]] && cuda_flag_="ON"
-  [[ "${enable_optix}" == true ]] && optix_flag_="ON"
 
   build_cmd_=(
     colcon build
@@ -202,16 +182,12 @@ run_colcon_build() {
   build_cmd_+=(
     --cmake-args
     "-DCMAKE_BUILD_TYPE=${build_type}"
-    "-DTEMPLATE_PROJECT_ENABLE_CUDA=${cuda_flag_}"
-    "-DTEMPLATE_PROJECT_ENABLE_OPTIX=${optix_flag_}"
     "${cmake_args[@]}"
   )
 
   info "Workspace : ${WORKSPACE_DIR}"
   info "ROS distro: ${ROS_DISTRO_NAME}"
   info "Build type: ${build_type}"
-  info "CUDA      : ${cuda_flag_}"
-  info "OptiX     : ${optix_flag_}"
 
   (
     cd "${WORKSPACE_DIR}"

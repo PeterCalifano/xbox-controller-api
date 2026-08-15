@@ -6,7 +6,7 @@
 include_guard(GLOBAL)
 
 set(
-  _CPP_CUDA_TEMPLATE_PYTHON_STAGE_SCRIPT
+  _XBOX_CONTROLLER_API_PYTHON_STAGE_SCRIPT
   "${CMAKE_CURRENT_LIST_DIR}/StagePythonRuntimeArtifacts.cmake")
 
 # Configure a Python extension to load co-located runtime libraries without
@@ -331,7 +331,7 @@ list(APPEND PYTHON_RUNTIME_NAMES [==[$<TARGET_SONAME_FILE_NAME:${_python_runtime
     COMMAND
       "${CMAKE_COMMAND}"
       "-DMANIFEST_FILE=${_python_manifest_file}"
-      -P "${_CPP_CUDA_TEMPLATE_PYTHON_STAGE_SCRIPT}"
+      -P "${_XBOX_CONTROLLER_API_PYTHON_STAGE_SCRIPT}"
     DEPENDS ${_python_runtime_targets}
     COMMENT "Validating and staging Python runtime artifacts"
     VERBATIM)

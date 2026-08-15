@@ -4,19 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-C++ CUDA/OptiX template project (by Pietro Califano) for building GPU-accelerated shared libraries with optional Python/MATLAB bindings. Uses CMake with C++20, Eigen3, and optional CUDA 12+, OptiX, OpenGL, and OpenMP backends.
+`xbox_controller_api` is a C++20 library for reading Xbox controller input, with
+optional Python bindings (via gtwrap) and an optional ROS 2 overlay. It was
+derived from Pietro Califano's `cpp_cuda_template_project` CMake template.
 
-<!-- ros2-overlay-begin -->
-## Optional ROS 2 Overlay
+**The controller API itself is not implemented yet.** The library currently
+exposes placeholders that mark where real code goes:
 
-See `doc/ros2_overlay.md` before changing the optional ROS 2 overlay. `./build_lib.sh` is the C++-first library entry point and never needs ROS. `./build_ros2.sh` is the optional ROS 2 overlay build and test entry point.
+- `src/xbox_controller_api/placeholder.h` / `.cpp` — core library seam
+- `src/wrapped_impl/CWrapperPlaceholder.h` / `.cpp` — wrapper-facing facade
+- `ros2/xbox_controller_api_ros/src/conversions.cpp` — ROS core-call seam,
+  marked with `EDIT ME` comments
 
-Keep ROS-related changes confined to `ros2/` plus the documented root helpers, docs, tests, markers, and the single ROS overlay workflow.
-<!-- ros2-overlay-end -->
+Keep these seams compiling. Replacing them is the actual feature work.
 
 ## Build Commands
 
-**Primary build entry point** is `build_lib.sh`:
+**Primary entry point** is `build_lib.sh` (never needs ROS):
 
 ```bash
 ./build_lib.sh                                # Default: RelWithDebInfo, output to ./build
@@ -24,59 +28,76 @@ Keep ROS-related changes confined to `ros2/` plus the documented root helpers, d
 ./build_lib.sh -t release -i                  # Release build + install
 ./build_lib.sh -N                             # Use Ninja generator
 ./build_lib.sh --clean                        # Clean rebuild
-./build_lib.sh -D ENABLE_CUDA=ON              # Enable CUDA support
+./build_lib.sh -p                             # Build the Python wrapper
 ./build_lib.sh -r                             # Rebuild only (skip CMake configure)
 ```
 
-**Running tests** (after build):
+**Tests** (after build):
 ```bash
-cd build && ctest --output-on-failure
+ctest --test-dir build --output-on-failure
+ctest --test-dir build --output-on-failure -L python    # pytest-backed only
+ctest --test-dir build --output-on-failure -L catch2    # compiled only
 ```
 
-**Manual CMake** (if needed):
+**Optional ROS 2 overlay** — see `doc/ros2_overlay.md` before changing it:
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build -j$(nproc)
+./build_ros2.sh --clean
 ```
+
+Keep ROS-related changes confined to `ros2/` plus the documented root helpers,
+docs, tests, markers, and the single ROS overlay workflow.
 
 ## Architecture
 
-### Build System (cmake/)
+### Build system (`cmake/`)
 
-The CMake system is highly modular. Each optional dependency has a dedicated handler module (`Handle*.cmake`) that creates INTERFACE targets with proper namespacing via `LIB_NAMESPACE`. Key modules:
+Modular: each optional dependency has a `Handle*.cmake` module creating INTERFACE
+targets namespaced via `LIB_NAMESPACE`. Key modules:
 
-- `HandleGitVersion.cmake` - Extracts semver from git tags, writes VERSION file, populates `config.h`
-- `HandleCUDA.cmake` - GPU architecture auto-detection, compiler flags
-- `HandleOptiX.cmake` - OptiX SDK integration, PTX compilation pipeline
-- `cmake_utils.cmake` - `add_tests()` and `add_examples()` convenience macros
-- `cmake_cuda_ptx_tools.cmake` - Compiles `.ptx.cu` files into embedded const char arrays
+- `HandleGitVersion.cmake` — semver from git tags, writes VERSION, populates `config.h`
+- `HandleWrapper.cmake` — gtwrap discovery/orchestration; dispatches to `HandlePythonWrapper.cmake`
+- `cmake_utils.cmake` — `add_tests()` and `add_examples()` macros
 
-All optional features default to OFF: `ENABLE_CUDA`, `ENABLE_OPTIX`, `ENABLE_OPENGL`, `ENABLE_TESTS` (ON by default).
+**`add_tests()` and `add_examples()` take positional arguments.** Passing an
+undefined variable expands to zero arguments and silently shifts every later
+one. Pass `""` to leave a slot empty.
 
-### Source Layout
+### Source layout
 
-- `src/template_src/` - Core C++ library implementation
-- `src/template_src_kernels/` - CUDA kernel code (`.cu`) and PTX kernels (`.ptx.cu`)
-- `src/wrapped_impl/` - C wrapper layer for Python/MATLAB bindings
-- `src/config.h.in` - CMake-configured header (version macros, feature flags)
-- `src/global_includes.h` - Shared utilities (ANSI colors, precision constants)
+- `src/xbox_controller_api/` — core C++ library implementation
+- `src/wrapped_impl/` — C wrapper layer for the Python bindings
+- `src/utils/logging/` — dependency-free component logger
+- `src/config.h.in` — CMake-configured header (version macros, feature flags)
+- `src/global_includes.h` — shared utilities (ANSI colors, precision constants)
 
 ### Testing
 
-Uses Catch2 (auto-fetched if not found). Inherited runtime tests live in
-`tests/template_test/`, CUDA runtime tests in `tests/template_cuda/`, and
-fixtures in `tests/template_fixtures/`. Test targets are created via the
-`add_tests()` macro from `cmake_utils.cmake`; generic template conformance is
-owned externally by `cpp_cuda_template_testfield`.
+Catch2 (auto-fetched if not found) for `test*.cpp`; pytest for `test*.py`; CTest
+is the common runner. Tests live in `tests/xbox_controller_api_test/`, fixtures
+in `tests/xbox_controller_api_fixtures/`.
 
-### Consumer Pattern
+### Consumer pattern
 
-`examples/template_consumer_project/` demonstrates using this library as an external CMake dependency via `find_package()`. All targets are exported under the `template_project::` namespace.
+`examples/consumer_project/` demonstrates external use via `find_package()`.
+Targets export as `xbox_controller_api::xbox_controller_api`.
 
 ## Conventions
 
 - Default build type is **RelWithDebInfo** (stricter warnings than Debug)
-- Version format: `MAJOR.MINOR.PATCH+<commit_hash>`, derived from git tags matching `v*.*.*`
-- File extensions: `.h` for headers, `.cu` for CUDA kernels, `.ptx.cu` for PTX compilation targets
+- Version format: `MAJOR.MINOR.PATCH+<commit_hash>`, from git tags matching `v*.*.*`
+- File extensions: `.h` for headers
 - `ACHTUNG!` prefix in comments marks critical warnings
-- Sanitizer builds available via `-DSANITIZE_BUILD=ON`
+- Sanitizer builds via `-DSANITIZE_BUILD=ON`
+- Logger env var is `XBOX_CONTROLLER_API_LOG_LEVEL`
+
+## Removed template features
+
+CUDA, OptiX, TensorRT, and the MATLAB wrapper were deliberately removed during
+tailoring. Do not reintroduce them incidentally. Two intentional exceptions
+remain and are **not** oversights:
+
+- `.devcontainer/` and `configure_devcontainer.sh` keep opt-in CUDA support
+  (defaults off) as reusable container infrastructure.
+- `cmake/HandleWrapper.cmake` retains gtwrap-root resolution and `matlab.h`
+  include discovery, because those sit on the shared code path the Python
+  wrapper uses and are inert while the option is OFF.

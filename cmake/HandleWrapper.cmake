@@ -1,13 +1,12 @@
-# Resolve gtwrap interfaces and coordinate optional Python and MATLAB wrappers.
+# Resolve gtwrap interfaces and coordinate the optional Python wrapper.
 #
 # This facade owns wrapper checkout discovery, synchronization, and common
 # interface configuration. Language-specific target and packaging behavior lives
-# in HandlePythonWrapper.cmake and HandleMatlabWrapper.cmake.
+# in HandlePythonWrapper.cmake.
 include_guard(GLOBAL)
 
 include(ExternalProject)
 include("${CMAKE_CURRENT_LIST_DIR}/HandlePythonWrapper.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/HandleMatlabWrapper.cmake")
 
 # Return whether every supplied wrapper interface is an existing `.i` file.
 function(check_interface_files_validity VALIDITY_BOOL)
@@ -207,7 +206,6 @@ endfunction()
 # Resolve shared interface, checkout, dependency, and namespace configuration.
 function(configure_gtwrappers_common)
   set(_gtwrap_python_option_name "${LIB_NAMESPACE}_BUILD_PYTHON_WRAPPER")
-  set(_gtwrap_matlab_option_name "${LIB_NAMESPACE}_BUILD_MATLAB_WRAPPER")
   set(_gtwrap_interface_var_name "${LIB_NAMESPACE}_WRAPPER_INTERFACE_FILES")
   set(_gtwrap_top_namespace_var_name "${LIB_NAMESPACE}_GTWRAP_TOP_NAMESPACE")
   set(_gtwrap_extra_deps_var_name "${LIB_NAMESPACE}_GTWRAP_DEPENDENCY_TARGETS")
@@ -303,14 +301,11 @@ function(configure_gtwrappers_common)
   if(NOT _valid_interface_files)
     message(WARNING
       "No valid wrapper interface files were configured in '${_gtwrap_interface_var_name}'. "
-      "Disabling both Python and MATLAB wrappers.")
+      "Disabling the Python wrapper.")
     set(${PROJECT_NAME}_WRAPPER_DISABLE_REASON "missing_or_invalid_interface_files" CACHE INTERNAL
         "Reason why wrapper generation is disabled for the project." FORCE)
     set(${_gtwrap_python_option_name} OFF CACHE BOOL
         "Disable Python wrapper build due to missing interface files."
-        FORCE)
-    set(${_gtwrap_matlab_option_name} OFF CACHE BOOL
-        "Disable MATLAB wrapper build due to missing interface files."
         FORCE)
     set(GTWRAP_INTERFACE_FILES "" PARENT_SCOPE)
     return()
@@ -504,7 +499,6 @@ endfunction()
 # Configure the enabled gtwrap language frontends for the current project.
 function(handle_gtwrappers)
   set(_gtwrap_python_option_name "${LIB_NAMESPACE}_BUILD_PYTHON_WRAPPER")
-  set(_gtwrap_matlab_option_name "${LIB_NAMESPACE}_BUILD_MATLAB_WRAPPER")
 
   set(${PROJECT_NAME}_PYTHON_WRAPPER_TARGET "" CACHE INTERNAL
       "Resolved Python wrapper target name for the project." FORCE)
@@ -514,11 +508,8 @@ function(handle_gtwrappers)
   if(NOT DEFINED ${_gtwrap_python_option_name})
     set(${_gtwrap_python_option_name} OFF)
   endif()
-  if(NOT DEFINED ${_gtwrap_matlab_option_name})
-    set(${_gtwrap_matlab_option_name} OFF)
-  endif()
 
-  if(NOT ${${_gtwrap_python_option_name}} AND NOT ${${_gtwrap_matlab_option_name}})
+  if(NOT ${${_gtwrap_python_option_name}})
     return()
   endif()
 
@@ -530,9 +521,5 @@ function(handle_gtwrappers)
 
   if(${${_gtwrap_python_option_name}})
     configure_python_gtwrapper()
-  endif()
-
-  if(${${_gtwrap_matlab_option_name}})
-    configure_matlab_gtwrapper()
   endif()
 endfunction()

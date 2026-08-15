@@ -53,7 +53,7 @@ PROJECT_NUMBER         = @FULL_VERSION@
 # for a project that appears at the top of each page and should give viewer a
 # quick idea about the purpose of the project. Keep the description short.
 
-PROJECT_BRIEF          = "GPU-accelerated C++ library template with optional CUDA, OptiX, TensorRT, and Python/MATLAB bindings"
+PROJECT_BRIEF          = "C++ library for reading Xbox controller input, with optional Python bindings and ROS 2 integration"
 
 # With the PROJECT_LOGO tag one can specify a logo or an icon that is included
 # in the documentation. The maximum height of the logo should not exceed 55
@@ -967,9 +967,7 @@ FILE_PATTERNS          = *.c \
                          *.for \
                          *.vhd \
                          *.vhdl \
-                         *.md \
-                         *.cu \
-                         *.cuh
+                         *.md
 
 # The RECURSIVE tag can be used to specify whether or not subdirectories should
 # be searched for input files as well.

@@ -65,8 +65,6 @@ jobs:
           cmake -S . -B "${BUILD_DIR}" -GNinja \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DENABLE_TESTS=OFF \
-            -DENABLE_CUDA=OFF \
-            -DENABLE_OPTIX=OFF \
             -DENABLE_OPENGL=OFF \
             -DBUILD_DOC_HTML=ON \
             -DBUILD_DOC_XML=ON \

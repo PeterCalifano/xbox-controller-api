@@ -20,7 +20,6 @@ build_type="relwithdebinfo"   # debug|release|relwithdebinfo|minsizerel
 run_tests=true
 CXX_FLAGS=""
 python_wrap=false
-matlab_wrap=false
 install=false
 use_ninja=false
 no_optim=false
@@ -136,7 +135,6 @@ Options:
                               Debug/RelWithDebInfo/Release
   -D, --define <var[=val]>    Extra CMake cache definitions (repeatable)
   -p, --python-wrap           Enable Python wrapper defaults (-DGTWRAP_BUILD_PYTHON_DEFAULT=ON)
-  -m, --matlab-wrap           Enable MATLAB wrapper defaults (-DGTWRAP_BUILD_MATLAB_DEFAULT=ON)
       --gtwrap-root <dir>     Path to wrap checkout root for gtwrap
                               (maps to -D<project>_GTWRAP_ROOT_DIR=<dir>)
       --wrap-update           Explicitly update a local wrap checkout to latest master
@@ -238,8 +236,8 @@ if ! command -v getopt > /dev/null 2>&1; then
   die "GNU getopt is required. On macOS: brew install gnu-getopt and adjust PATH."
 fi
 
-OPTIONS=B:j:rt:c:f:D:pmhNni
-LONGOPTIONS=buildpath:,jobs:,rebuild-only,type:,type-build:,checks,flagsCXX:,define:,python-wrap,matlab-wrap,gtwrap-root:,wrap-update,no-wrap-update,wrap-submodule-init,no-wrap-submodule-init,help,ninja-build,no-optim,skip-tests,clean,install,profile,toolchain:,python-test-conda-env:,python-test-conda-prefix:,python-test-executable:,ctest-extra-args:
+OPTIONS=B:j:rt:c:f:D:phNni
+LONGOPTIONS=buildpath:,jobs:,rebuild-only,type:,type-build:,checks,flagsCXX:,define:,python-wrap,gtwrap-root:,wrap-update,no-wrap-update,wrap-submodule-init,no-wrap-submodule-init,help,ninja-build,no-optim,skip-tests,clean,install,profile,toolchain:,python-test-conda-env:,python-test-conda-prefix:,python-test-executable:,ctest-extra-args:
 PARSED=$(getopt -o "$OPTIONS" -l "$LONGOPTIONS" -- "$@") || { usage; exit 2; }
 eval set -- "$PARSED"
 
@@ -254,7 +252,6 @@ while true; do
     -f|--flagsCXX)        CXX_FLAGS="$2"; shift 2 ;;
     -D|--define)          cmake_defines+=( "-D$2" ); shift 2 ;;
     -p|--python-wrap)     python_wrap=true; shift ;;
-    -m|--matlab-wrap)     matlab_wrap=true; shift ;;
         --gtwrap-root)    gtwrap_root="$2"; shift 2 ;;
         --wrap-update)    wrap_update=true; shift ;;
         --no-wrap-update) wrap_update=false; shift ;;
@@ -328,7 +325,7 @@ fi
 project_name="$(detect_project_name || true)"
 prepare_wrap_checkout=false
 
-if [[ "$rebuild_only" == false && ( "$python_wrap" == true || "$matlab_wrap" == true ) ]]; then
+if [[ "$rebuild_only" == false && "$python_wrap" == true ]]; then
   if has_wrapper_interface_override; then
     prepare_wrap_checkout=true
   elif [[ -f "${project_root}/src/wrap_interface.i" ]]; then
@@ -365,7 +362,6 @@ info "Extra CXX flags    : ${CXX_FLAGS:-<none>}"
 info "Extra CMake defines: ${cmake_defines[*]:-<none>}"
 info "Extra CTest args   : ${ctest_extra_args:-<none>}"
 info "Python wrapper     : $python_wrap"
-info "MATLAB wrapper     : $matlab_wrap"
 info "Detected project   : ${project_name:-<unknown>}"
 info "GTWRAP root        : ${gtwrap_root:-<auto>}"
 info "GTWRAP update      : $wrap_update (branch: $wrap_branch)"
@@ -410,13 +406,6 @@ if [[ "$rebuild_only" == false ]]; then
       cmake_args+=( "-D${project_name}_BUILD_PYTHON_WRAPPER=ON" )
     else
       cmake_args+=( -DGTWRAP_BUILD_PYTHON_DEFAULT=ON )
-    fi
-  fi
-  if [[ "$matlab_wrap" == true ]]; then
-    if [[ -n "$project_name" ]]; then
-      cmake_args+=( "-D${project_name}_BUILD_MATLAB_WRAPPER=ON" )
-    else
-      cmake_args+=( -DGTWRAP_BUILD_MATLAB_DEFAULT=ON )
     fi
   fi
   if [[ -n "$gtwrap_root" ]]; then

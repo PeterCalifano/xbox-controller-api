@@ -12,38 +12,26 @@ cmake --build build --parallel 4
 ctest --test-dir build --output-on-failure
 ```
 
-Compiled tests are discovered from `test*.cpp` and `test*.cu` files and run with
+Compiled tests are discovered from `test*.cpp` files and run with
 Catch2. Python tests are discovered from `test*.py` files and registered as
 normal CTest entries that execute `python -m pytest -q <test-file>`.
 
-### Template conformance versus derived-project acceptance
+### Test ownership
 
-The template's default CTest suite is already the derived-project suite. It
-contains inherited C++ logger/starter behavior, Python import smoke coverage,
-optional CUDA initialization/placeholder behavior, reusable fixtures, and
-target-owned MATLAB wrapper checks. Tailoring does not rewrite its
-registrations.
+The default CTest suite covers inherited C++ logger/starter behavior, Python
+import smoke coverage, and reusable fixtures.
 
-Generic template-system conformance is implemented by the standalone harness in
-`cpp_cuda_template_testfield`. That harness receives an explicit candidate
-source path and owns tailoring, workflows, release metadata, packaging,
-installation, consumer, nested-build, cross-compilation, CUDA/OptiX, wrapper,
-and static ROS contracts. Its verifier implementations are not copied into this
-repository or a derived project.
+Ordinary CTest must not configure and rebuild this project again merely to
+cover an option combination, headless build, installation, package archive, or
+consumer build. Put those gates in explicit fresh out-of-tree acceptance
+commands or CI jobs, where build ownership, prerequisites, logs, and artifacts
+are visible.
 
-Do not reproduce them as recursive CMake tests in a derived project. In
-particular, ordinary derived-project CTest must not configure and rebuild the
-same project again merely to cover an option combination, headless build,
-installation, package archive, or consumer build. Put those gates in explicit
-fresh out-of-tree acceptance commands or CI jobs, where build ownership,
-prerequisites, logs, and artifacts are visible.
+Permanent CMake-script tests are limited to lightweight, project-owned checks
+that cannot be expressed through Catch2, pytest, an existing build target, or
+the acceptance matrix. They must not create nested full-project builds.
 
-Permanent CMake-script tests in a derived project are limited to lightweight,
-project-owned checks that cannot be expressed through Catch2, pytest, an
-existing build target, or the acceptance matrix. They must not import
-`VerifyTemplateProject*` scripts or create nested full-project builds.
-
-Catch2 remains the unit-test framework for the core C++ and CUDA project. Tests
+Catch2 remains the unit-test framework for the core C++ project. Tests
 inside ROS packages are the deliberate exception: they use
 `ament_cmake_gtest` so test targets and results participate in the ament/colcon
 workspace contract. This ROS-specific integration does not change the native
@@ -51,7 +39,7 @@ project's Catch2 policy.
 
 The discovery helper is shared by starter projects and downstream projects:
 
-- `test*.cpp` and `test*.cu`: compiled only when Catch2 is available.
+- `test*.cpp`: compiled only when Catch2 is available.
 - `test*.py`: registered when `ENABLE_TESTS=ON` and `ENABLE_PYTHON_TESTS=ON`.
 - `EXCLUDED_LIST`: accepts either full filenames such as `testSlow.py` or stems
   such as `testSlow`.
@@ -124,30 +112,16 @@ cmake --build --preset docs
 
 ## CI Workflows
 
-The active `.github/workflows/*.yml` files are reusable project workflows and
-survive normal tailoring unchanged. There are no dormant `.tpl` copies. Native
-CPU, CUDA, ROS, and Pages workflows therefore exercise the same definitions
-that a derived project receives.
-
-Template-system workflow structure and behavior is checked from TestField
-against an explicitly selected candidate. The parser-backed contract validates
-triggers, job topology, checkout depth, shell syntax, current Pages actions,
-ROS step ordering, and metadata drift behavior without adding those checks to
-ordinary project CTest.
+The project ships native CPU, ROS, and Pages workflows in
+`.github/workflows/*.yml`.
 
 The Linux workflows keep CPU tuning portable because build artifacts are tested in a separate job. Do not re-enable `CPU_ENABLE_NATIVE_TUNING=ON` in GitHub Actions unless build and test run on the same pinned CPU family.
 
-The native CPU, CUDA, and ROS workflows also run for `v*.*.*` tag pushes.
+The native CPU and ROS workflows also run for `v*.*.*` tag pushes.
 Their existing `paths` filters continue to scope branch
 pushes and pull requests; GitHub does not evaluate path filters for tag pushes,
 so a release tag still executes the release-relevant build gates. See
 [GitHub workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushpull_requestpull_request_targetpathspaths-ignore).
-
-CUDA jobs require a self-hosted runner with the labels `Linux`, `X64`, `gpu`,
-and `cuda`. Set the repository variable `CI_USE_SELF_HOSTED` to `true` only
-while such a runner is available. When the variable is unset or has any other
-value, both CUDA jobs are skipped before runner allocation, so release-tag and
-manual workflow runs do not remain queued indefinitely.
 
 The ROS workflow executes `./generate_version.sh --sync-ros2` when the helper
 advertises full metadata synchronization, then rejects any tracked manifest
@@ -162,14 +136,12 @@ project has not adopted that capability yet. After workflow-owned
 synchronization, CI passes
 `--no-version-sync` to the build helper to avoid a second unguarded rewrite.
 
-Project workflows install only their runtime/build prerequisites. PyYAML and
-the parser-backed contract belong to TestField rather than the delivered
-project. Documentation jobs install Doxygen and Graphviz; CUDA jobs validate
-their host tools before configuring.
+Project workflows install only their runtime/build prerequisites.
+Documentation jobs install Doxygen and Graphviz.
 
 The Pages workflow is separate from the C++ build workflow. It has these stages:
 
-1. Configure docs with CUDA, OptiX, and tests disabled.
+1. Configure docs with tests disabled.
 2. Build Doxygen HTML and XML.
 3. Verify `index.html` exists before upload.
 4. Upload the Pages artifact.
@@ -187,12 +159,12 @@ Issue forms are structured so bug reports capture:
 
 - build mode and compiler
 - operating system and runner type
-- CUDA/OptiX/wrapper settings
+- wrapper settings
 - failing command and output excerpt
 - whether the problem affects docs or Pages
 - whether the project is top-level or nested through `add_subdirectory`
 
-Feature requests should state the owning surface: C++ library, CUDA/OptiX, wrappers, versioning, docs/Pages, CI, packaging, or testfield validation.
+Feature requests should state the owning surface: C++ library, Python wrapper, ROS 2 overlay, versioning, docs/Pages, CI, or packaging.
 
 ## Stop Rule
 

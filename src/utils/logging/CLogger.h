@@ -11,7 +11,7 @@
 #include <string_view>
 #include <utility>
 
-namespace template_project::logging
+namespace xbox_controller_api::logging
 {
     /**
      * @brief Ordered logging threshold used by CLogger.
@@ -61,7 +61,7 @@ namespace template_project::logging
          * @brief Construct a logger for one component.
          *
          * @param charComponentName Component printed in each line. An empty name is
-         * replaced with `template_project`.
+         * replaced with `xbox_controller_api`.
          * @param enumLevel Initial verbosity threshold.
          * @param enumColorMode Explicit ANSI color policy. Disabled by default for
          * deterministic redirected output and CI logs.
@@ -109,7 +109,7 @@ namespace template_project::logging
          * @return True only when a valid value was found and applied.
          */
         bool setLevelFromEnvironment(
-            std::string_view charVariableName = "TEMPLATE_PROJECT_LOG_LEVEL");
+            std::string_view charVariableName = "XBOX_CONTROLLER_API_LOG_LEVEL");
 
         /** @brief Emit a critical message when enabled. */
         template <StreamInsertable... TArgs>
@@ -189,4 +189,4 @@ namespace template_project::logging
         std::ostream &objOutputStream_;
         std::ostream &objDiagnosticStream_;
     };
-} // namespace template_project::logging
+} // namespace xbox_controller_api::logging

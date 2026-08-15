@@ -3,7 +3,7 @@
 
 Merge-preserve behaviour: the existing devcontainer.json (if any) is loaded
 first and only the keys managed by this script are rewritten. Everything else
-(remoteEnv extras such as OPTIX_HOME, customizations settings, mounts, ...) is
+(remoteEnv extras, customizations settings, mounts, ...) is
 kept verbatim, so re-running the configure script never wipes project-specific
 settings. The default VS Code extension set (DEFAULT_EXTENSIONS) is seeded and
 guaranteed present, while any extra extensions in the file are preserved.

@@ -4,17 +4,15 @@ if(POLICY CMP0144)
   cmake_policy(SET CMP0144 NEW)
 endif()
 set(PROJECT_PYTHON_VERSION 3.12)
-set(MATLAB_DEFAULT_RELEASE "R2023b")
 
 #set(CMAKE_C_COMPILER gcc-11)
 #set(CMAKE_CXX_COMPILER g++-11)
-#set(CMAKE_CUDA_COMPILER nvcc)
 
 # PROJECT DEFINITION
-set(project_name "template_project")
+set(project_name "xbox_controller_api")
 set(project_description
-    "Reusable C++/CUDA library template with optional CUDA, OptiX, Python, MATLAB, and ROS 2 support")
-set(project_homepage_url "https://github.com/PeterCalifano/cpp_cuda_template_project")
+    "C++ library for reading Xbox controller input, with optional Python bindings and ROS 2 integration")
+set(project_homepage_url "https://github.com/PeterCalifano/xbox-controller-api")
 set(PROJECT_MAINTAINER_NAME "Pietro Califano" CACHE STRING "Project maintainer name")
 set(PROJECT_MAINTAINER_EMAIL "petercalifano.gs@gmail.com" CACHE STRING "Project maintainer email")
 set(PROJECT_LICENSE "MIT" CACHE STRING "Project SPDX license identifier")
@@ -34,11 +32,8 @@ endif()
 # Project-qualified options are canonical in nested builds. Preserve the
 # historical generic spellings only as one-config top-level input aliases.
 set(METADATA_ONLY_OPTION_NAME "${project_name}_METADATA_ONLY")
-set(ENABLE_OPTIX_OPTION_NAME "${project_name}_ENABLE_OPTIX")
-set(ENABLE_CUDA_OPTION_NAME "${project_name}_ENABLE_CUDA")
-set(ENABLE_TENSORRT_OPTION_NAME "${project_name}_ENABLE_TENSORRT")
 
-function(_template_project_migrate_top_level_bool_option_alias legacy_option
+function(_xbox_controller_api_migrate_top_level_bool_option_alias legacy_option
          canonical_option option_help)
   if(NOT BUILD_AS_MAIN_PROJECT)
     return()
@@ -58,47 +53,22 @@ function(_template_project_migrate_top_level_bool_option_alias legacy_option
   unset("${legacy_option}" CACHE)
 endfunction()
 
-_template_project_migrate_top_level_bool_option_alias(
+_xbox_controller_api_migrate_top_level_bool_option_alias(
     PROJECT_METADATA_ONLY "${METADATA_ONLY_OPTION_NAME}"
     "Configure only project identity and version metadata")
-_template_project_migrate_top_level_bool_option_alias(
-    ENABLE_OPTIX "${ENABLE_OPTIX_OPTION_NAME}" "Enable OptiX")
-_template_project_migrate_top_level_bool_option_alias(
-    ENABLE_CUDA "${ENABLE_CUDA_OPTION_NAME}" "Enable CUDA")
-_template_project_migrate_top_level_bool_option_alias(
-    ENABLE_TENSORRT "${ENABLE_TENSORRT_OPTION_NAME}" "Enable TensorRT")
 
 option(${METADATA_ONLY_OPTION_NAME}
        "Configure only project identity and version metadata"
        OFF)
-option(${ENABLE_OPTIX_OPTION_NAME} "Enable OptiX" OFF)
-option(${ENABLE_CUDA_OPTION_NAME} "Enable CUDA" OFF)
-option(${ENABLE_TENSORRT_OPTION_NAME} "Enable TensorRT" OFF)
 
 # Retained modules consume the historical local variable names. Normal
 # directory-scope assignments isolate them from a parent's cache entries.
 set(PROJECT_METADATA_ONLY "${${METADATA_ONLY_OPTION_NAME}}")
-set(ENABLE_OPTIX "${${ENABLE_OPTIX_OPTION_NAME}}")
-set(ENABLE_CUDA "${${ENABLE_CUDA_OPTION_NAME}}")
-set(ENABLE_TENSORRT "${${ENABLE_TENSORRT_OPTION_NAME}}")
-
-# OptiX and TensorRT both require the project CUDA feature when languages and
-# dependency targets are configured.
-if(ENABLE_OPTIX OR ENABLE_TENSORRT)
-  set(ENABLE_CUDA ON)
-endif()
 
 if(PROJECT_METADATA_ONLY)
   set(languages NONE)
 else()
-  set(languages CXX) # ACHTUNG: PTX code requires C language!
-
-  if(ENABLE_CUDA)
-    list(APPEND languages CUDA)
-    if(ENABLE_OPTIX)
-      list(APPEND languages C)
-    endif()
-  endif()
+  set(languages CXX)
 endif()
 
 # Add git version handling
@@ -146,9 +116,6 @@ set(LIB_NAMESPACE "${PROJECT_NAME}")
 if (DEFINED LIB_NAMESPACE_OVERRIDE)
   set(LIB_NAMESPACE "${LIB_NAMESPACE_OVERRIDE}")
 endif()
-set(CUDA_COMPILE_TARGET "${LIB_NAMESPACE}_cuda_compile_interface")
-set(OPTIX_COMPILE_TARGET "${LIB_NAMESPACE}_optix_compile_interface")
-set(TENSORRT_COMPILE_TARGET "${LIB_NAMESPACE}_tensorrt_compile_interface")
 set(OPENGL_COMPILE_TARGET "${LIB_NAMESPACE}_opengl_compile_interface")
 set(LIB_COMPILE_TARGET "${LIB_NAMESPACE}_lib_compile_interface")
 set(SANITIZER_TARGET "${LIB_NAMESPACE}_sanitizer_target_interface")
@@ -185,10 +152,6 @@ include(GNUInstallDirs)
 # Add cmake modules
 include(ExternalProject)
 
-# Add GPU dependency handlers
-include(cmake/HandleCUDA.cmake)
-include(cmake/HandleOptiX.cmake)
-include(cmake/HandleTensorRT.cmake)
 include(cmake/HandleTBB.cmake)
 
 # Add handle of python
@@ -228,12 +191,7 @@ endif()
 if (NOT DEFINED GTWRAP_BUILD_PYTHON_DEFAULT)
   set(GTWRAP_BUILD_PYTHON_DEFAULT OFF CACHE BOOL "Default Python wrapper setting for all subprojects")
 endif()
-if (NOT DEFINED GTWRAP_BUILD_MATLAB_DEFAULT)
-  set(GTWRAP_BUILD_MATLAB_DEFAULT OFF CACHE BOOL "Default MATLAB wrapper setting for all subprojects")
-endif()
-
 set(GTWRAP_PYTHON_OPTION_NAME "${LIB_NAMESPACE}_BUILD_PYTHON_WRAPPER")
-set(GTWRAP_MATLAB_OPTION_NAME "${LIB_NAMESPACE}_BUILD_MATLAB_WRAPPER")
 set(GTWRAP_INTERFACE_OPTION_NAME "${LIB_NAMESPACE}_WRAPPER_INTERFACE_FILES")
 set(GTWRAP_TOP_NAMESPACE_OPTION_NAME "${LIB_NAMESPACE}_GTWRAP_TOP_NAMESPACE")
 set(GTWRAP_DEPENDENCIES_OPTION_NAME "${LIB_NAMESPACE}_GTWRAP_DEPENDENCY_TARGETS")
@@ -242,7 +200,6 @@ set(GTWRAP_RUNTIME_DEPENDENCIES_OPTION_NAME
 set(GTWRAP_ROOT_OPTION_NAME "${LIB_NAMESPACE}_GTWRAP_ROOT_DIR")
 
 option(${GTWRAP_PYTHON_OPTION_NAME} "Build Python wrapper" ${GTWRAP_BUILD_PYTHON_DEFAULT})
-option(${GTWRAP_MATLAB_OPTION_NAME} "Build MATLAB wrapper" ${GTWRAP_BUILD_MATLAB_DEFAULT})
 
 if (NOT DEFINED ${GTWRAP_INTERFACE_OPTION_NAME})
   set(${GTWRAP_INTERFACE_OPTION_NAME}
@@ -254,7 +211,7 @@ endif()
 
 if (NOT DEFINED ${GTWRAP_TOP_NAMESPACE_OPTION_NAME})
   set(${GTWRAP_TOP_NAMESPACE_OPTION_NAME}
-      "cpp_playground"
+      "xbox_controller_api"
       CACHE STRING
       "Top namespace used for gtwrap code generation."
       FORCE)
@@ -286,7 +243,6 @@ endif()
 
 option(NO_OPTIMIZATION "Disable optimization flags" OFF)
 option(WARNINGS_ARE_ERRORS "Treat warnings as errors" OFF)
-option(USE_SYS_OPTIX_SDK "Use Optix system folder if specified" OFF)
 option(SANITIZE_BUILD "Enable sanitizers in build" OFF)
 set(SANITIZERS "address,undefined,leak" CACHE STRING "Sanitizers to enable when SANITIZE_BUILD is ON (comma-separated)")
 option(ENABLE_TBB "Enable Intel oneTBB support" OFF)
@@ -296,11 +252,6 @@ option(CPU_ENABLE_SIMD "Enable explicit SIMD ISA flags for GNU/Clang in optimize
 set(CPU_SIMD_LEVEL "native" CACHE STRING "SIMD ISA when CPU_ENABLE_SIMD=ON: native,sse4.2,avx,avx2,avx512f")
 set_property(CACHE CPU_SIMD_LEVEL PROPERTY STRINGS native sse4.2 avx avx2 avx512f)
 set(CPU_EXTRA_OPT_FLAGS "" CACHE STRING "Extra CPU optimization flags for GNU/Clang optimized builds")
-option(CUDA_ENABLE_FMAD "Enable fused multiply-add contraction in NVCC (--fmad=true)" ON)
-option(CUDA_ENABLE_EXTRA_DEVICE_VECTORIZATION "Enable NVCC extra device vectorization" OFF)
-option(CUDA_USE_FAST_MATH "Enable NVCC fast math in regular CUDA compilation" OFF)
-option(CUDA_PTX_USE_FAST_MATH "Enable NVCC fast math when compiling PTX kernels" ON)
-set(CUDA_NVCC_EXTRA_FLAGS "" CACHE STRING "Extra flags passed to NVCC for CUDA/PTX compilation")
 set(EXTRA_C_FLAGS "" CACHE STRING "Extra C compiler flags appended to project-managed flags")
 set(EXTRA_CXX_FLAGS "" CACHE STRING "Extra C++ compiler flags appended to project-managed flags")
 set(PYTHON_EXECUTABLE "python3") # Specify the Python executable to use
@@ -343,37 +294,7 @@ if(BUILD_AS_MAIN_PROJECT)
   collect_project_source_inventory(
     ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
     COMPILED_SOURCES_OUT PROJECT_LIBRARY_COMPILED_SOURCES
-    PTX_SOURCES_OUT PROJECT_LIBRARY_PTX_SOURCES
-    HAS_COMPILED_SOURCES_OUT PROJECT_HAS_COMPILED_SOURCES
-    HAS_PTX_SOURCES_OUT PROJECT_HAS_PTX_SOURCES)
-
-  if(ENABLE_OPTIX)
-    if(NOT PROJECT_HAS_COMPILED_SOURCES)
-      message(FATAL_ERROR
-        "ENABLE_OPTIX=ON is not supported for header-only library layouts. "
-        "No compilable library sources (*.cpp or *.cu excluding *.ptx.cu) were found under src/ outside src/bin. "
-        "Add a compiled source file or disable ENABLE_OPTIX.")
-    endif()
-
-    if(NOT PROJECT_HAS_PTX_SOURCES)
-      message(FATAL_ERROR
-        "ENABLE_OPTIX=ON requires at least one PTX kernel source (*.ptx.cu) under src/ outside src/bin. "
-        "Add a PTX kernel file or disable ENABLE_OPTIX.")
-    endif()
-  endif()
-endif()
-
-# Configure GPU dependency targets in dependency order. Each handler creates a
-# stable interface target even when its feature is disabled.
-handle_cuda(TARGET ${CUDA_COMPILE_TARGET} 
-            MIN_VERSION 12.0)
-handle_tensorrt(TARGET ${TENSORRT_COMPILE_TARGET})
-handle_optix(TARGET ${OPTIX_COMPILE_TARGET} 
-             CUDA_TARGET ${CUDA_COMPILE_TARGET})
-
-if (ENABLE_CUDA)
-  # Add tools to manage cuda and ptx
-  include(cmake/cmake_cuda_ptx_tools.cmake)
+    HAS_COMPILED_SOURCES_OUT PROJECT_HAS_COMPILED_SOURCES)
 endif()
 
 # Handle OpenGL (creates interface targets even when disabled)
@@ -387,9 +308,6 @@ handle_submodules() # Automatically adds subdirectories in lib/ (and build them 
 # Set the dependencies for the automated export
 set(EXPORT_TARGET_DEPS Eigen3) # TODO make automatic based on used packages
 
-if(ENABLE_CUDA)
-  list(APPEND EXPORT_TARGET_DEPS CUDAToolkit)
-endif()
 if (ENABLE_OPENGL)
   list(APPEND EXPORT_TARGET_DEPS OpenGL::GL)
 endif()
@@ -435,8 +353,6 @@ target_include_directories(${project_name}_include INTERFACE
                            #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/stb_PeterCdev>  
                            #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/rapidyaml_PeterCdev>
                            #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/gdt>
-                           #$<BUILD_INTERFACE:${CUDA_INCLUDE_DIRS}> 
-                           #$<BUILD_INTERFACE:${OPTIX_INCLUDE_DIR}>   
                            #$<BUILD_INTERFACE:${OpenCV_INCLUDE_DIRS}>  # Add OpenCV include directories
                            $<INSTALL_INTERFACE:include/${project_name}>  # Used in installed projects
 )
@@ -485,12 +401,9 @@ if(BUILD_AS_MAIN_PROJECT)
   handle_gtwrappers() # You may also pass WRAP_INTERFACE_FILES variable to specify interface files, else autofetching is used
 
   # Determine if any wrapper is enabled
-  if(${GTWRAP_PYTHON_OPTION_NAME} OR ${GTWRAP_MATLAB_OPTION_NAME})
+  if(${GTWRAP_PYTHON_OPTION_NAME})
     set(ANY_WRAPPER_ENABLED ON)
   endif()
-
-  include("${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/AddMatlabWrapperRegressionTests.cmake")
-  add_template_matlab_wrapper_regression_tests()
 endif()
 
 ###########################################################################
@@ -511,28 +424,6 @@ message(STATUS "CMAKE_CXX_COMPILER                        : ${CMAKE_CXX_COMPILER
 message(STATUS "CMAKE_CXX_COMPILER_ID type                : ${CMAKE_CXX_COMPILER_ID}")
 message(STATUS "CMAKE_CXX_COMPILER_VERSION                : ${CMAKE_CXX_COMPILER_VERSION}")
 
-if (ENABLE_OPTIX)
-  # C compiler
-  message(STATUS "CMAKE_C_COMPILER                          : ${CMAKE_C_COMPILER}")
-  message(STATUS "CMAKE_C_COMPILER_ID type                  : ${CMAKE_C_COMPILER_ID}")
-  message(STATUS "CMAKE_C_COMPILER_VERSION                  : ${CMAKE_C_COMPILER_VERSION}")
-endif()
-
-# CUDA arch and compiler
-if (ENABLE_CUDA)
-  message(STATUS "CUDA enabled                             : ${ENABLE_CUDA}")
-  message(STATUS "CUDA architecture                        : ${cuda_arch}")
-  message(STATUS "CUDA architecture sm version             : ${sm_version}")
-  message(STATUS "CMAKE_CUDA_COMPILER                      : ${CMAKE_CUDA_COMPILER}")
-  message(STATUS "CMAKE_CUDA_COMPILER_ID type              : ${CMAKE_CUDA_COMPILER_ID}")
-  message(STATUS "CMAKE_CUDA_COMPILER_VERSION              : ${CMAKE_CUDA_COMPILER_VERSION}")
-  message(STATUS "CUDA FMAD                                : ${CUDA_ENABLE_FMAD}")
-  message(STATUS "CUDA extra device vectorization          : ${CUDA_ENABLE_EXTRA_DEVICE_VECTORIZATION}")
-  message(STATUS "CUDA fast math (regular compile)         : ${CUDA_USE_FAST_MATH}")
-  message(STATUS "CUDA fast math (PTX compile)             : ${CUDA_PTX_USE_FAST_MATH}")
-  message(STATUS "CUDA extra NVCC flags                    : ${CUDA_NVCC_EXTRA_FLAGS}")
-endif()
-message(STATUS "TensorRT enabled                         : ${ENABLE_TENSORRT}")
 message(STATUS "TBB enabled                              : ${ENABLE_TBB}")
 message(STATUS "CPU native tuning                        : ${CPU_ENABLE_NATIVE_TUNING}")
 message(STATUS "CPU SIMD enabled                         : ${CPU_ENABLE_SIMD}")
@@ -561,8 +452,6 @@ print_compiler_flags_summary()
 if (ANY_WRAPPER_ENABLED)
   message(STATUS "================  Wrappers Configuration  ======================")
   message(STATUS "Python gtwrapper                            : ${${GTWRAP_PYTHON_OPTION_NAME}}")
-  message(STATUS "MATLAB gtwrapper                            : ${${GTWRAP_MATLAB_OPTION_NAME}}")
-  message(STATUS "MATLAB default release                      : ${MATLAB_DEFAULT_RELEASE}")
   message(STATUS "Python executable                           : ${PYTHON_EXECUTABLE}")
   message(STATUS "Python version                              : ${PROJECT_PYTHON_VERSION}")
   message(STATUS "gtwrap interface option name                : ${GTWRAP_INTERFACE_OPTION_NAME}")

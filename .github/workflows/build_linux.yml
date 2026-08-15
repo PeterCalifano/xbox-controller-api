@@ -91,8 +91,6 @@ jobs:
             -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
             -DENABLE_TESTS=ON \
             -DENABLE_TBB="${ENABLE_TBB}" \
-            -DENABLE_CUDA=OFF \
-            -DENABLE_OPTIX=OFF \
             -DENABLE_OPENGL=OFF \
             -DCPU_ENABLE_NATIVE_TUNING=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \

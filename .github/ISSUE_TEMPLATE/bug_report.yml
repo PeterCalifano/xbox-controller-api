@@ -17,13 +17,11 @@ body:
       label: Affected surface
       options:
         - C++ library
-        - CUDA or OptiX
         - Python wrapper
-        - MATLAB wrapper
+        - ROS 2 overlay
         - Versioning or packaging
         - Documentation or GitHub Pages
         - CI workflow
-        - Testfield or nested-library validation
     validations:
       required: true
   - type: textarea
@@ -53,14 +51,14 @@ body:
     id: compiler
     attributes:
       label: Compiler and CMake
-      placeholder: "GCC 13.2, CMake 3.28.3, CUDA 12.6"
+      placeholder: "GCC 13.2, CMake 3.28.3"
     validations:
       required: true
   - type: textarea
     id: configuration
     attributes:
       label: Build configuration
-      description: Include CMake cache flags, wrapper flags, CUDA architecture, toolchain file, and whether this is a top-level or nested build.
+      description: Include CMake cache flags, wrapper flags, toolchain file, and whether this is a top-level or nested build.
       render: text
     validations:
       required: true

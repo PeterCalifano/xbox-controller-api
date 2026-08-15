@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <mutex>
 
-namespace template_project::logging
+namespace xbox_controller_api::logging
 {
     namespace
     {
@@ -44,7 +44,7 @@ namespace template_project::logging
     CLogger::CLogger(std::string charComponentName, const ELogLevel enumLevel,
                      const ELogColorMode enumColorMode, std::ostream &objOutputStream,
                      std::ostream &objDiagnosticStream)
-        : charComponentName_(charComponentName.empty() ? "template_project"
+        : charComponentName_(charComponentName.empty() ? "xbox_controller_api"
                                                        : std::move(charComponentName)),
           enumLevel_(enumLevel), enumColorMode_(enumColorMode), objOutputStream_(objOutputStream),
           objDiagnosticStream_(objDiagnosticStream)
@@ -233,4 +233,4 @@ namespace template_project::logging
             return {};
         }
     }
-} // namespace template_project::logging
+} // namespace xbox_controller_api::logging

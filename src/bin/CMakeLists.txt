@@ -1,5 +1,5 @@
 # Add programs to build
-set(EXAMPLES_PATTERN "*.cpp" "*.cu")
+set(EXAMPLES_PATTERN "*.cpp")
 file(GLOB srcProgramsFiles RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${EXAMPLES_PATTERN})
 
 # Exclude EXCLUDED_LIST from the list of examples
@@ -18,7 +18,7 @@ foreach(exampleFile ${srcProgramsFiles})
     get_filename_component(program_name ${exampleFile} NAME_WE)
     add_executable(${program_name} ${exampleFile})
 
-    target_link_libraries(${program_name} PRIVATE ${project_name} ${CUDA_COMPILE_TARGET})
+    target_link_libraries(${program_name} PRIVATE ${project_name})
 
     # Optionally add additional targets or properties if required
     set_target_properties(${program_name} PROPERTIES OUTPUT_NAME "${program_name}")

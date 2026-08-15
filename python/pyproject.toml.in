@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "@PROJECT_NAME@"
 version = "@PYTHON_PACKAGE_VERSION@"
-description = "Python bindings for @PROJECT_NAME@."
+description = "Python bindings for @PROJECT_NAME@ (Xbox controller input)."
 requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
-  {name = "spectral_raytracer contributors"}
+  {name = "Pietro Califano", email = "petercalifano.gs@gmail.com"}
 ]
 
 [tool.setuptools]
