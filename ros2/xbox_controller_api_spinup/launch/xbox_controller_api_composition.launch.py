@@ -17,6 +17,8 @@ import os
 
 
 class _LifecycleNodeIdentity:
+    """Adapt a fully qualified node name for LifecycleEventManager."""
+
     def __init__(self, charFullyQualifiedName_: str) -> None:
         self.charFullyQualifiedName_ = charFullyQualifiedName_
 
@@ -26,15 +28,17 @@ class _LifecycleNodeIdentity:
 
 
 class ComposableLifecycleNode(_RosComposableLifecycleNode):
+    """Composable lifecycle node with a Jazzy autostart workaround."""
+
     def __init__(self, *, autostart: bool = False, **kwargs: object) -> None:
         self.bAutostart_ = autostart
         self.charFullyQualifiedName_ = ""
 
-        # Jazzy joins composed autostart namespaces without a separator. The local
-        # action below preserves autostart=True while replacing only that transition.
+        # Work around launch_ros#481, which builds the composed node name incorrectly.
         super().__init__(autostart=False, **kwargs)
 
     def init_lifecycle_event_manager(self, objContext_: LaunchContext) -> None:
+        """Create a lifecycle manager for the fully qualified composed node."""
         charNodeName_ = perform_substitutions(objContext_, self.node_name)
         charNodeNamespace_ = ""
         if self.node_namespace is not None:
@@ -50,16 +54,18 @@ class ComposableLifecycleNode(_RosComposableLifecycleNode):
         if not self.charFullyQualifiedName_.startswith("/"):
             self.charFullyQualifiedName_ = f"/{self.charFullyQualifiedName_}"
 
-        # Jazzy launch_ros#481: composed autostart otherwise matches a relative node identity.
+        # Use the full node name so autostart targets the composed component.
         self.objLifecycleEventManager_ = LifecycleEventManager(
             _LifecycleNodeIdentity(self.charFullyQualifiedName_)
         )
         self.objLifecycleEventManager_.setup_lifecycle_manager(objContext_)
 
     def makeAutostartAction(self) -> OpaqueFunction:
+        """Create the autostart launch action."""
         return OpaqueFunction(function=self._autostart)
 
     def _autostart(self, objContext_: LaunchContext) -> list[LifecycleTransition]:
+        """Return configure and activate transitions when autostart is enabled."""
         if not self.bAutostart_:
             return []
 
@@ -76,6 +82,7 @@ class ComposableLifecycleNode(_RosComposableLifecycleNode):
 
 
 def generate_launch_description() -> LaunchDescription:
+    """Create a composed controller launch description with autostart."""
     objPackageShare_ = get_package_share_directory("xbox_controller_api_spinup")
     charParamsFile_ = os.path.join(objPackageShare_, "config", "xbox_controller_api.yaml")
     objLifecycleNode_ = ComposableLifecycleNode(
@@ -93,9 +100,9 @@ def generate_launch_description() -> LaunchDescription:
             package="rclcpp_components",
             executable="component_container",
             composable_node_descriptions=[
-                # Autostart configures and activates the component after it is loaded.
+                # Autostart configures and activates the component after loading.
                 objLifecycleNode_
-                # Template alternative: ComposableNode requires an external lifecycle manager.
+                # Alternative for an external lifecycle manager.
                 # ComposableNode(
                 #     package="xbox_controller_api_ros",
                 #     plugin="xbox_controller_api_ros::CXboxControllerLifecycleNode",

@@ -7,11 +7,12 @@ import os
 
 
 def generate_launch_description() -> LaunchDescription:
+    """Create a standalone controller launch description with autostart."""
     objPackageShare_ = get_package_share_directory("xbox_controller_api_spinup")
     charParamsFile_ = os.path.join(objPackageShare_, "config", "xbox_controller_api.yaml")
 
     return LaunchDescription([
-        # LifecycleNode autostart asks launch_ros to configure and activate the node.
+        # Autostart configures and activates the node.
         LifecycleNode(
             package="xbox_controller_api_ros",
             executable="xbox_controller_api_node",
@@ -21,7 +22,7 @@ def generate_launch_description() -> LaunchDescription:
             parameters=[charParamsFile_],
             autostart=True,
         )
-        # Template alternative: Node starts unconfigured and requires an external lifecycle manager.
+        # Alternative for an external lifecycle manager.
         # Node(
         #     package="xbox_controller_api_ros",
         #     executable="xbox_controller_api_node",

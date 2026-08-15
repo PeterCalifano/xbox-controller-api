@@ -1,3 +1,9 @@
+/**
+ * @file joy_conversion.h
+ * @brief Converts controller snapshots to sensor_msgs/msg/Joy messages.
+ * @details Defines the stable axis and button order used by the ROS 2 bridge.
+ */
+
 #pragma once
 
 #include <sensor_msgs/msg/joy.hpp>
@@ -8,10 +14,10 @@
 
 namespace xbox_controller_api_ros {
 
-/// Number of axes published in sensor_msgs/Joy, in the order documented below.
+/// @brief Number of axes published in each Joy message.
 inline constexpr std::size_t kJoyAxisCount = 6U;
 
-/// Index of each axis within the published Joy message.
+/// @brief Index of an axis within a published Joy message.
 enum class EJoyAxis : std::size_t {
   LeftStickX = 0U,
   LeftStickY = 1U,
@@ -23,15 +29,12 @@ enum class EJoyAxis : std::size_t {
 
 /// @brief Convert a library snapshot into a sensor_msgs/Joy message.
 ///
-/// Axes follow the library conventions rather than the raw SDL ones: sticks lie
-/// in [-1, 1] with Y positive upward, and triggers lie in [0, 1]. Buttons are
-/// emitted in xbox_controller_api::AllGamepadButtons() order, which is a
-/// documented stable contract, so a subscriber can index them reliably.
+/// Axes use the library's normalized values: sticks are in [-1, 1] with Y
+/// positive upward, and triggers are in [0, 1]. Buttons follow
+/// xbox_controller_api::AllGamepadButtons() order.
 ///
-/// The header stamp is deliberately left unset. Snapshot timestamps come from a
-/// steady clock whose epoch is arbitrary, so only the node can supply a ROS
-/// time; keeping that out of here also keeps this function free of rclcpp and
-/// therefore testable without a ROS context.
+/// The stamp is left unset because snapshot timestamps use a steady clock. The
+/// lifecycle node supplies ROS time before publication.
 ///
 /// @param strGamepadState Snapshot to convert.
 /// @param charFrameId Frame id to place in the message header.

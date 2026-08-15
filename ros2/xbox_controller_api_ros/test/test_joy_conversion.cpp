@@ -1,3 +1,8 @@
+/**
+ * @file test_joy_conversion.cpp
+ * @brief Tests Joy message conversion without a ROS executor.
+ */
+
 #include "xbox_controller_api_ros/joy_conversion.h"
 
 #include <gtest/gtest.h>
@@ -36,8 +41,7 @@ TEST(JoyConversion, AxesFollowTheDocumentedOrderAndConventions) {
 }
 
 TEST(JoyConversion, ButtonsFollowTheLibraryControlOrder) {
-  // Press one control at a time and require that exactly the matching Joy index
-  // reports it, which is what pins the published button ordering.
+  // Verify that each library button maps to the same Joy index.
   const auto spanButtons_ = xbox_controller_api::AllGamepadButtons();
 
   for (std::size_t szPressedIndex_ = 0; szPressedIndex_ < spanButtons_.size(); ++szPressedIndex_) {
@@ -83,8 +87,7 @@ TEST(JoyConversion, ADefaultSnapshotPublishesEverythingAtRest) {
     EXPECT_EQ(i32Button_, 0);
   }
 
-  // The stamp is the node's responsibility, so the converter must leave it unset
-  // rather than inventing a time from the snapshot's steady-clock value.
+  // The lifecycle node, not the converter, supplies the ROS timestamp.
   EXPECT_EQ(objJoy_.header.stamp.sec, 0);
   EXPECT_EQ(objJoy_.header.stamp.nanosec, 0U);
 }

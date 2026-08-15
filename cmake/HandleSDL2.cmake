@@ -12,12 +12,8 @@ if (NOT DEFINED ENABLE_SDL2_STRICT)
            OFF)
 endif()
 
-# Resolve SDL2 and record the outcome on an INTERFACE target.
-#
-# ENABLE_SDL2 expresses what the caller asked for, while SDL2_ENABLED reports
-# what was actually resolved. Keeping the two separate is what allows the
-# default non-strict mode to warn and continue without leaving the request flag
-# contradicting the build that was produced.
+# Resolve SDL2 and record the result on an INTERFACE target.
+# ENABLE_SDL2 is the request; SDL2_ENABLED is the resolved outcome.
 function(handle_sdl2)
     set(oneValueArgs TARGET)
     cmake_parse_arguments(HSDL "" "${oneValueArgs}" "" ${ARGN})
@@ -26,9 +22,7 @@ function(handle_sdl2)
         set(HSDL_TARGET sdl2_compile_interface)
     endif()
 
-    # The interface target always exists, even when SDL2 is unavailable, so
-    # dependents can reference it unconditionally instead of guarding every
-    # link site. When disabled it simply carries no usage requirements.
+    # The target always exists. Without SDL2 it has no usage requirements.
     if(NOT TARGET ${HSDL_TARGET})
         add_library(${HSDL_TARGET} INTERFACE)
     endif()
@@ -46,9 +40,7 @@ function(handle_sdl2)
     set(_charResolvedVersion "")
     set(_charUnavailableReason "")
 
-    # Prefer the upstream CMake package. It is the only discovery mode whose
-    # imported target a consumer of the installed export can recreate, through
-    # find_dependency(SDL2).
+    # Prefer the CMake package because exported consumers can recreate its target.
     find_package(SDL2 CONFIG QUIET)
 
     if(SDL2_FOUND AND TARGET SDL2::SDL2)
@@ -69,10 +61,8 @@ function(handle_sdl2)
                 set(_charUnavailableReason
                     "ENABLE_SDL2 is ON but SDL2 was found through neither its CMake package nor pkg-config.")
             else()
-                # Link the resolved flags rather than the PkgConfig:: imported
-                # target. This interface target is installed and exported, and an
-                # imported target created by pkg_check_modules does not exist in
-                # a consumer's project, which would break its configure step.
+                # Export resolved flags: PkgConfig imported targets are local to
+                # this configure and cannot be used by installed consumers.
                 target_link_libraries(${HSDL_TARGET} INTERFACE ${SDL2_PC_LINK_LIBRARIES})
 
                 if(SDL2_PC_INCLUDE_DIRS)
@@ -84,9 +74,7 @@ function(handle_sdl2)
         endif()
     endif()
 
-    # A missing dependency is fatal only when the caller asked for that, so an
-    # ordinary developer build degrades to the stub backend while CI can demand
-    # the real one.
+    # Strict mode fails; non-strict mode builds the stub backend.
     if(_charUnavailableReason)
         if(ENABLE_SDL2_STRICT)
             message(FATAL_ERROR "${_charUnavailableReason}")

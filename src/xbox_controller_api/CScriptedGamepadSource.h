@@ -1,10 +1,7 @@
 /**
  * @file CScriptedGamepadSource.h
  * @brief Deterministic gamepad source that replays a queued script of samples.
- * @details Exists so consumer logic, edge detection, and deadzone policy can be
- *          exercised without a controller, a driver, or SDL. It is also the
- *          replay backend for recorded sessions, which is why it lives in the
- *          shipped library rather than in the test tree.
+ * @details Replays samples without a controller, driver, or SDL dependency.
  */
 #pragma once
 
@@ -20,9 +17,7 @@ namespace xbox_controller_api
     /**
      * @brief Gamepad source whose samples come from a caller-supplied queue.
      *
-     * Each update() consumes one queued frame in FIFO order, so a test drives
-     * time explicitly instead of waiting on real hardware. The class is final
-     * because it adds no extension point of its own.
+     * Each update() consumes one queued frame in FIFO order.
      */
     class CScriptedGamepadSource final : public CGamepadSource
     {
@@ -30,11 +25,8 @@ namespace xbox_controller_api
         /**
          * @brief Queue one connected sample for a later update().
          *
-         * The queued copy is forced to a connected state: pushFrame() means "a
-         * device answered with these values", while a detach is expressed only
-         * through pushDisconnect(). The sequence id is assigned on consumption
-         * and any value set here is overwritten; the timestamp is preserved
-         * verbatim so replays stay bit-for-bit reproducible.
+         * The queued copy is marked connected. update() assigns its sequence id
+         * and preserves its timestamp.
          *
          * @param strFrame Sample values to replay.
          */
@@ -43,8 +35,7 @@ namespace xbox_controller_api
         /**
          * @brief Queue an unplug event for a later update().
          *
-         * The queued frame is the canonical zeroed snapshot, so a replayed
-         * disconnect is indistinguishable from one a real backend publishes.
+         * The queued frame is the canonical zeroed disconnected snapshot.
          */
         void pushDisconnect();
 
@@ -54,9 +45,7 @@ namespace xbox_controller_api
         /**
          * @brief Consume the next queued frame and publish it.
          *
-         * An exhausted queue is deliberately not treated as a disconnect: the
-         * previously published snapshot is left untouched so a caller can tell
-         * "the script ended" from "the device went away".
+         * An exhausted queue leaves the previous snapshot unchanged.
          *
          * @return True when a connected frame was published; false when the
          *         queue was empty or the consumed frame was a disconnect.

@@ -1,10 +1,8 @@
 /**
  * @file GamepadControls.cpp
  * @brief Implements the button identity table and snapshot-level operations.
- * @details The binding table below is the single authority pairing a control
- *          identity with its snapshot member and its name. Everything else in
- *          this file, and every consumer that iterates controls, derives from
- *          it, so adding a control means adding one row.
+ * @details The binding table maps each button identity to its state member and
+ *          stable name.
  */
 
 #include <xbox_controller_api/GamepadControls.h>
@@ -58,9 +56,7 @@ namespace xbox_controller_api
             return true;
         }
 
-        // Lookup below indexes the table directly by identity, so a row typed in
-        // the wrong position must be a build failure rather than a silent
-        // mislabelled control.
+        // Direct indexing requires table order to match the enum values.
         static_assert(AreBindingsInEnumerationOrder(),
                       "arrButtonBindings must be ordered exactly as EGamepadButton");
 
@@ -95,8 +91,7 @@ namespace xbox_controller_api
 
     bool GetButton(const SGamepadState &strGamepadState, EGamepadButton enumButton) noexcept
     {
-        // An identity arriving from a binding or a file can be out of range, so
-        // this reports "not pressed" rather than reading past the table.
+        // Reject invalid identities before indexing the table.
         if (!IsKnownButton(enumButton))
         {
             return false;

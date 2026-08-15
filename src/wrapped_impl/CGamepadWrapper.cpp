@@ -1,10 +1,7 @@
 /**
  * @file CGamepadWrapper.cpp
  * @brief Implements the flat binding-facing controller facade.
- * @details The facade keeps one conditioned snapshot and projects it through
- *          scalar accessors. Conditioning once per sample, rather than inside
- *          every accessor, keeps the cost proportional to the poll rate instead
- *          of to how many controls the caller happens to read.
+ * @details The facade stores one conditioned snapshot for its scalar accessors.
  */
 
 #include <wrapped_impl/CGamepadWrapper.h>
@@ -19,7 +16,7 @@ namespace xbox_controller_api
 {
     namespace
     {
-        /// @brief Translate a caller-supplied index into a control identity.
+        /// @brief Translate a button index into a control identity.
         /// @return False when the index does not name a control.
         [[nodiscard]] bool TryResolveButton(std::int32_t i32ButtonIndex,
                                             EGamepadButton &enumResolvedButton) noexcept
@@ -99,13 +96,10 @@ namespace xbox_controller_api
 
     void CGamepadWrapper::setStickDeadzone(double dStickDeadzone)
     {
-        // Out-of-range values are meaningful rather than invalid: the filter
-        // treats them as "disabled" and "fully suppressed" respectively, so no
-        // validation is needed and no caller input is silently discarded.
+        // Values outside [0, 1] disable or fully suppress stick input.
         dStickDeadzone_ = dStickDeadzone;
 
-        // Reshape immediately so a deadzone change takes effect without
-        // requiring another poll first.
+        // Apply the new deadzone to the current snapshot immediately.
         refreshConditionedState_();
     }
 
@@ -136,8 +130,7 @@ namespace xbox_controller_api
 
     double CGamepadWrapper::leftTrigger() const
     {
-        // Triggers are unidirectional, so the stick deadzone deliberately does
-        // not apply: suppressing a light pull is a different policy decision.
+        // Stick deadzones do not affect unidirectional triggers.
         return strConditionedState_.dLeftTrigger_;
     }
 

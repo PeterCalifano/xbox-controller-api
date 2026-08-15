@@ -1,13 +1,8 @@
 /**
  * @file CGamepadWrapper.h
  * @brief Flat, binding-friendly facade over the SDL2 gamepad source.
- * @details The generator that produces the Python bindings handles a narrow
- *          subset of C++: no overloads, no references to aggregates, no
- *          templates. This class therefore trades the snapshot-oriented C++ API
- *          for one scalar accessor per control, which is also the shape a Python
- *          caller expects. It owns the deadzone policy the native API leaves to
- *          the consumer, so a script gets conditioned values without importing
- *          the filter layer.
+ * @details Provides scalar accessors for binding generators that cannot expose
+ *          the snapshot-oriented C++ API directly.
  */
 #pragma once
 
@@ -22,21 +17,18 @@ namespace xbox_controller_api
     /**
      * @brief Binding-facing controller facade with per-control accessors.
      *
-     * Every accessor reads the snapshot published by the most recent update(),
-     * so a caller polls once per loop iteration and then reads as many controls
-     * as it likes without re-sampling the device.
-     *
-     * In a build without the SDL2 backend the class still exists and still
-     * compiles: open() returns false and every accessor reports its rest value.
-     * A script therefore branches on a returned bool rather than on an
-     * exception or a missing attribute.
-     *
-     * The type is neither copyable nor movable, because it owns a device handle.
+     * Call update() once per poll and read the resulting snapshot through the
+     * accessors. The wrapper applies its configured stick deadzone to that
+     * snapshot. With no SDL2 backend, open() returns false and accessors report
+     * rest values.
      */
     class CGamepadWrapper
     {
       public:
+        /** @brief Create a wrapper without opening a controller. */
         CGamepadWrapper();
+
+        /** @brief Release resources owned by the wrapped controller source. */
         ~CGamepadWrapper();
 
         CGamepadWrapper(const CGamepadWrapper &) = delete;
@@ -44,7 +36,10 @@ namespace xbox_controller_api
         CGamepadWrapper(CGamepadWrapper &&) = delete;
         CGamepadWrapper &operator=(CGamepadWrapper &&) = delete;
 
-        /** @brief Report whether this build contains the SDL2 backend. */
+        /**
+         * @brief Report whether this build contains the SDL2 backend.
+         * @return True when SDL2 support was compiled in.
+         */
         [[nodiscard]] static bool isBackendAvailable();
 
         /**
@@ -56,8 +51,7 @@ namespace xbox_controller_api
         /**
          * @brief Attach to an explicit joystick index.
          *
-         * Kept as a separate name rather than an overload of open(), because the
-         * binding generator cannot disambiguate overloaded methods.
+         * A distinct name avoids an overload in the generated bindings.
          *
          * @param i32JoystickIndex Joystick index to attach to.
          * @return True when a device was attached; see lastError() otherwise.
@@ -73,79 +67,121 @@ namespace xbox_controller_api
          */
         [[nodiscard]] bool update();
 
-        /** @brief True while a device is attached and answering polls. */
+        /**
+         * @brief Report whether a device is attached and answering polls.
+         * @return True while the current snapshot is connected.
+         */
         [[nodiscard]] bool connected() const;
 
-        /** @brief Device name reported by SDL, empty when nothing is open. */
+        /**
+         * @brief Return the device name reported by SDL.
+         * @return Empty string when no controller is open.
+         */
         [[nodiscard]] std::string deviceName() const;
 
-        /** @brief Description of the most recent failure, empty when none. */
+        /**
+         * @brief Return the most recent failure description.
+         * @return Empty string when no failure has been recorded.
+         */
         [[nodiscard]] std::string lastError() const;
 
         /**
          * @brief Set the deadzone applied to the four stick axes.
          *
-         * Defaults to 0.0, which passes normalized values through untouched, so
-         * the wrapper never silently reshapes input a caller did not ask to
-         * reshape. Triggers are unidirectional and are never deadzoned here.
+         * The default 0.0 passes values through. Triggers are unchanged.
          *
          * @param dStickDeadzone Deadzone half-width; values <= 0 disable it and
          *        values >= 1 suppress the sticks entirely.
          */
         void setStickDeadzone(double dStickDeadzone);
 
-        /** @brief Currently configured stick deadzone. */
+        /**
+         * @brief Return the configured stick deadzone.
+         * @return Deadzone half-width supplied to setStickDeadzone().
+         */
         [[nodiscard]] double stickDeadzone() const;
 
-        /** @brief Left stick X in [-1, 1], positive to the right. */
+        /**
+         * @brief Return left stick X, positive to the right.
+         * @return Conditioned value in [-1, 1].
+         */
         [[nodiscard]] double leftStickX() const;
 
-        /** @brief Left stick Y in [-1, 1], positive upward. */
+        /**
+         * @brief Return left stick Y, positive upward.
+         * @return Conditioned value in [-1, 1].
+         */
         [[nodiscard]] double leftStickY() const;
 
-        /** @brief Right stick X in [-1, 1], positive to the right. */
+        /**
+         * @brief Return right stick X, positive to the right.
+         * @return Conditioned value in [-1, 1].
+         */
         [[nodiscard]] double rightStickX() const;
 
-        /** @brief Right stick Y in [-1, 1], positive upward. */
+        /**
+         * @brief Return right stick Y, positive upward.
+         * @return Conditioned value in [-1, 1].
+         */
         [[nodiscard]] double rightStickY() const;
 
-        /** @brief Left trigger in [0, 1]; never deadzoned. */
+        /**
+         * @brief Return the left trigger value.
+         * @return Value in [0, 1], unchanged by the stick deadzone.
+         */
         [[nodiscard]] double leftTrigger() const;
 
-        /** @brief Right trigger in [0, 1]; never deadzoned. */
+        /**
+         * @brief Return the right trigger value.
+         * @return Value in [0, 1], unchanged by the stick deadzone.
+         */
         [[nodiscard]] double rightTrigger() const;
 
+        /** @name Named button accessors */
+        /// @{
+        /** @brief Return the current A button state. @return True when pressed. */
         [[nodiscard]] bool buttonA() const;
+        /** @brief Return the current B button state. @return True when pressed. */
         [[nodiscard]] bool buttonB() const;
+        /** @brief Return the current X button state. @return True when pressed. */
         [[nodiscard]] bool buttonX() const;
+        /** @brief Return the current Y button state. @return True when pressed. */
         [[nodiscard]] bool buttonY() const;
+        /** @brief Return the current left shoulder state. @return True when pressed. */
         [[nodiscard]] bool leftShoulder() const;
+        /** @brief Return the current right shoulder state. @return True when pressed. */
         [[nodiscard]] bool rightShoulder() const;
+        /** @brief Return the current left stick-click state. @return True when pressed. */
         [[nodiscard]] bool leftStickClick() const;
+        /** @brief Return the current right stick-click state. @return True when pressed. */
         [[nodiscard]] bool rightStickClick() const;
+        /** @brief Return the current Back button state. @return True when pressed. */
         [[nodiscard]] bool back() const;
+        /** @brief Return the current Start button state. @return True when pressed. */
         [[nodiscard]] bool start() const;
+        /** @brief Return the current Guide button state. @return True when pressed. */
         [[nodiscard]] bool guide() const;
+        /** @brief Return the current D-pad up state. @return True when pressed. */
         [[nodiscard]] bool dpadUp() const;
+        /** @brief Return the current D-pad down state. @return True when pressed. */
         [[nodiscard]] bool dpadDown() const;
+        /** @brief Return the current D-pad left state. @return True when pressed. */
         [[nodiscard]] bool dpadLeft() const;
+        /** @brief Return the current D-pad right state. @return True when pressed. */
         [[nodiscard]] bool dpadRight() const;
+        /// @}
 
         /**
          * @brief Sequence number of the published sample, 0 before the first.
          *
-         * Lets a script detect a missed or repeated poll without comparing every
-         * control value.
+         * Zero means no sample has been published.
          */
         [[nodiscard]] std::uint64_t sequenceId() const;
 
         /**
          * @brief Number of buttons reachable through the indexed accessors.
          *
-         * The indexed trio below exists so a script can iterate controls
-         * generically instead of hard-coding its own list of accessor names.
-         * The named accessors above remain the ergonomic choice when a script
-         * wants one specific control.
+         * Use buttonName() and buttonPressed() to iterate controls.
          */
         [[nodiscard]] std::int32_t buttonCount() const;
 
@@ -157,8 +193,7 @@ namespace xbox_controller_api
 
         /**
          * @brief Pressed state for an index in [0, buttonCount()).
-         * @return The pressed state, or false when the index is out of range,
-         *         so a bad index from a script cannot read out of bounds.
+         * @return The pressed state, or false when the index is out of range.
          */
         [[nodiscard]] bool buttonPressed(std::int32_t i32ButtonIndex) const;
 
@@ -166,12 +201,10 @@ namespace xbox_controller_api
         /**
          * @brief Recompute the conditioned snapshot every accessor reads.
          *
-         * Called whenever the sample or the deadzone changes, so the shaping
-         * cost is paid once per poll rather than once per accessor call.
+         * Called after each source update and deadzone change.
          */
         void refreshConditionedState_();
 
-      private:
         CSdlGamepadSource objSource_;
         double dStickDeadzone_{0.0};
         SGamepadState strConditionedState_;

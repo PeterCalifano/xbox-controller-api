@@ -1,11 +1,7 @@
 /// @file example_read_controller.cpp
 /// @brief Live read-out of an attached controller at a fixed 50 Hz poll rate.
-/// @details Demonstrates the intended consumer shape: open once, poll on a
-///          cadence the caller owns, derive button edges through the pure
-///          filters, and treat a detach as an explicit stop rather than
-///          something the library silently recovers from. Runs for a bounded
-///          time so it is safe to launch from a script, and exits cleanly when
-///          no controller or no backend is present.
+/// @details Opens a controller, polls at 50 Hz, prints button transitions, and
+///          stops after the requested duration or a disconnect.
 ///
 /// Usage:
 ///     ./example_read_controller [runtime_seconds]
@@ -59,8 +55,7 @@ namespace
         char *charParseEnd_ = nullptr;
         const long i64Parsed_ = std::strtol(argv[1], &charParseEnd_, 10);
 
-        // Reject trailing garbage as well as out-of-range values, so a typo
-        // cannot silently turn into an unexpected run length.
+        // Accept only a complete, positive runtime in the supported range.
         const bool bIsValid_ = (charParseEnd_ != argv[1]) && (*charParseEnd_ == '\0') &&
                                (i64Parsed_ > 0) && (i64Parsed_ <= i64MaximumRuntimeSeconds);
 
@@ -78,15 +73,13 @@ namespace
     /// @brief Print every button that changed between two consecutive samples.
     void PrintButtonEdges(const SGamepadState &strPreviousState, const SGamepadState &strCurrentState)
     {
-        // Driven by the library's control list, so this loop needs no knowledge
-        // of how many controls exist or where they live in the snapshot.
+        // Iterate the library's stable control list.
         for (const EGamepadButton enumButton_ : AllGamepadButtons())
         {
             const EButtonEdge enumEdge_ =
                 ClassifyButtonEdge(strPreviousState, strCurrentState, enumButton_);
 
-            // Only transitions are interesting; Held and None would repeat at
-            // the poll rate and drown out everything else.
+            // Print transitions, not repeated held states.
             if (enumEdge_ == EButtonEdge::Pressed)
             {
                 std::cout << "  [" << strCurrentState.ui64SequenceId_ << "] "
@@ -103,8 +96,6 @@ namespace
     /// @brief Report whether any axis of a conditioned sample is deflected.
     [[nodiscard]] bool HasAxisActivity(const SGamepadState &strConditionedState) noexcept
     {
-        // The caller conditions the whole snapshot once per poll, so this reads
-        // already-shaped values instead of re-running the deadzone per axis.
         return std::abs(strConditionedState.dLeftStickX_) > 0.0 ||
                std::abs(strConditionedState.dLeftStickY_) > 0.0 ||
                std::abs(strConditionedState.dRightStickX_) > 0.0 ||
@@ -128,8 +119,7 @@ int main(int argc, char **argv)
 {
     const int i32RuntimeSeconds_ = ParseRuntimeSeconds(argc, argv);
 
-    // Both unavailability cases exit successfully: this is a demo, and a machine
-    // without SDL2 or without a pad has not done anything wrong.
+    // This example treats an unavailable backend or controller as a normal exit.
     if (!CSdlGamepadSource::isBackendAvailable())
     {
         std::cout << "SDL2 backend is not compiled into this build; nothing to read.\n"
@@ -151,8 +141,7 @@ int main(int argc, char **argv)
               << " s.\nPress Start to quit early. Sticks use a " << dDisplayDeadzone
               << " deadzone.\n";
 
-    // The previous sample starts fully released, so a button already held at
-    // startup registers as a press on the first poll.
+    // A held button is reported as pressed on the first poll.
     SGamepadState strPreviousState_;
 
     const std::chrono::steady_clock::time_point objDeadline_ =
@@ -164,16 +153,14 @@ int main(int argc, char **argv)
         const std::chrono::steady_clock::time_point objFrameStart_ =
             std::chrono::steady_clock::now();
 
-        // A failed poll on an opened device means the pad went away, which this
-        // demo treats as a reason to stop rather than to retry.
+        // A failed poll after open() means the controller was detached.
         if (!objSource_.update())
         {
             std::cout << "Controller detached after " << i32PollCount_ << " polls; stopping.\n";
             break;
         }
 
-        // Condition the whole snapshot once per poll. Everything downstream then
-        // reads shaped values, rather than each read re-running the deadzone.
+        // Apply the display deadzone once per sample.
         const SGamepadState strState_ = ApplyStickDeadzone(objSource_.state(), dDisplayDeadzone);
 
         PrintButtonEdges(strPreviousState_, strState_);
@@ -185,8 +172,7 @@ int main(int argc, char **argv)
             break;
         }
 
-        // Decimate the axis read-out so a resting pad stays silent and an active
-        // one does not scroll the button edges off screen.
+        // Limit axis output to keep button transitions readable.
         if ((i32PollCount_ % i32AxisPrintDecimation == 0) && HasAxisActivity(strState_))
         {
             PrintAxes(strState_);
@@ -195,8 +181,7 @@ int main(int argc, char **argv)
         strPreviousState_ = strState_;
         ++i32PollCount_;
 
-        // Sleep against the frame start so the cadence does not drift with the
-        // time spent polling and printing.
+        // Keep the poll cadence relative to the frame start.
         std::this_thread::sleep_until(objFrameStart_ + objPollPeriod);
     }
 

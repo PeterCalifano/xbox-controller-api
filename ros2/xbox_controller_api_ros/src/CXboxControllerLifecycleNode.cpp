@@ -1,3 +1,8 @@
+/**
+ * @file CXboxControllerLifecycleNode.cpp
+ * @brief Implements the controller Joy publisher lifecycle node.
+ */
+
 #include "xbox_controller_api_ros/CXboxControllerLifecycleNode.h"
 
 #include <rclcpp_components/register_node_macro.hpp>
@@ -11,10 +16,10 @@ namespace xbox_controller_api_ros {
 namespace {
 using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
-/// Slowest publish rate accepted, below which the node is not useful.
+/// @brief Lowest accepted publish rate.
 constexpr double kMinimumPublishRateHz = 1.0;
 
-/// Fastest publish rate accepted, above which polling dominates the CPU.
+/// @brief Highest accepted publish rate.
 constexpr double kMaximumPublishRateHz = 1000.0;
 }  // namespace
 
@@ -24,8 +29,7 @@ CXboxControllerLifecycleNode::CXboxControllerLifecycleNode(const rclcpp::NodeOpt
       dPublishRateHz_(50.0),
       dStickDeadzone_(0.0),
       charFrameId_("xbox_controller") {
-  // A negative index selects the lowest-numbered game controller, matching the
-  // library default.
+  // A negative index selects the first SDL game controller.
   declare_parameter<int>("joystick_index", i32JoystickIndex_);
   declare_parameter<double>("publish_rate_hz", dPublishRateHz_);
   declare_parameter<double>("stick_deadzone", dStickDeadzone_);
@@ -46,15 +50,10 @@ CallbackReturn CXboxControllerLifecycleNode::on_configure(const rclcpp_lifecycle
     return CallbackReturn::FAILURE;
   }
 
-  // Default reliable QoS, matching the standard joy node. Sensor-data QoS would
-  // be defensible for a stream of samples, but it is best effort and therefore
-  // incompatible with the reliable subscriptions used by teleop_twist_joy and
-  // most existing joystick consumers, which is the interoperability this
-  // publisher exists for.
+  // Use reliable QoS for compatibility with standard joystick consumers.
   objJoyPublisher_ = create_publisher<sensor_msgs::msg::Joy>("~/joy", rclcpp::QoS(10));
 
-  // No device access happens here, so configuring is safe with nothing plugged
-  // in and the failure to find hardware is reported at activation instead.
+  // Hardware is opened during activation, not configuration.
   RCLCPP_INFO(
       get_logger(),
       "Configured: index=%d rate=%.1f Hz deadzone=%.3f frame_id=%s",
@@ -92,8 +91,7 @@ CallbackReturn CXboxControllerLifecycleNode::on_deactivate(const rclcpp_lifecycl
   objPollTimer_.reset();
   objJoyPublisher_->on_deactivate();
 
-  // Release the device here rather than at cleanup, so a deactivate/activate
-  // cycle is the documented way to reattach after a detach.
+  // Releasing the device here enables a later activate() to reconnect.
   objSource_.close();
 
   return CallbackReturn::SUCCESS;
@@ -116,10 +114,7 @@ sensor_msgs::msg::Joy CXboxControllerLifecycleNode::makeStampedJoyMessage(
 
 void CXboxControllerLifecycleNode::pollAndPublish() {
   if (!objSource_.update()) {
-    // The library reports a detach and never heals it, so stop publishing and
-    // leave reattachment to an explicit deactivate/activate cycle. Publish the
-    // neutral snapshot once first, so a subscriber holding the last command
-    // sees a safe value rather than the deflection read before the unplug.
+    // Publish one neutral message, then stop until the node is reactivated.
     objJoyPublisher_->publish(makeStampedJoyMessage(objSource_.state()));
 
     objPollTimer_->cancel();

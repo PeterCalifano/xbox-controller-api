@@ -1,8 +1,7 @@
 """Live controller read-out through the xbox_controller_api Python bindings.
 
-Mirrors ``examples/xbox_controller_api_examples/example_read_controller.cpp``:
-open once, poll at a fixed rate the caller owns, report button transitions
-rather than levels, and stop on a detach instead of silently reconnecting.
+Mirrors ``examples/xbox_controller_api_examples/example_read_controller.cpp``.
+It polls at a fixed rate, reports button transitions, and stops on disconnect.
 
 This file is not part of any build. Run it against a built wrapper, for example:
 
@@ -32,7 +31,7 @@ import xbox_controller_api
 # Poll period matching the 50 Hz sampling rate of the demo.
 POLL_PERIOD_S: float = 0.02
 
-# Runtime applied when the caller passes no argument, or an unusable one.
+# Runtime applied when no argument is supplied.
 DEFAULT_RUNTIME_S: int = 20
 
 # Upper bound accepted for the runtime argument, in seconds.
@@ -41,7 +40,7 @@ MAXIMUM_RUNTIME_S: int = 3600
 # Deadzone applied to the sticks, inside the suggested 0.10 to 0.20 range.
 DISPLAY_DEADZONE: float = 0.15
 
-# Print the axis summary at 5 Hz rather than at the full poll rate.
+# Print the axis summary at 5 Hz.
 AXIS_PRINT_DECIMATION: int = 10
 
 # Name of the control used to quit early, as reported by the library.
@@ -50,9 +49,6 @@ QUIT_BUTTON_NAME: str = "Start"
 
 def button_names(wrapper_: xbox_controller_api.CGamepadWrapper) -> tuple[str, ...]:
     """List every control the library exposes, in its canonical order.
-
-    The list comes from the library rather than from a table kept here, so a
-    control added to the C++ side appears without editing this script.
 
     Args:
         wrapper_: Wrapper to query.
@@ -84,9 +80,6 @@ def print_button_edges(
     sequence_id_: int,
 ) -> None:
     """Print only the buttons that changed between two consecutive samples.
-
-    Levels would repeat at the poll rate, so transitions are what a reader can
-    actually follow.
 
     Args:
         previous_states_: Button states from the preceding poll.
@@ -139,9 +132,8 @@ def has_axis_activity(wrapper_: xbox_controller_api.CGamepadWrapper) -> bool:
 def parse_arguments() -> argparse.Namespace:
     """Parse the optional bounded runtime argument.
 
-    A runtime outside ``(0, MAXIMUM_RUNTIME_S]`` is reported and replaced by the
-    default rather than honoured, mirroring the C++ sibling: a typo must not
-    silently turn into an unexpected run length.
+    Integer values outside ``(0, MAXIMUM_RUNTIME_S]`` are replaced with the
+    default. argparse reports non-integer input as a command-line error.
 
     Returns:
         Parsed arguments carrying a validated ``runtime_seconds``.
@@ -172,9 +164,8 @@ def main() -> int:
     """Poll an attached controller and report its activity.
 
     Returns:
-        Process exit status. Absent bindings, an absent backend, and an absent
-        controller are all reported as success, since none of them is an error
-        on the part of the caller.
+        Process exit status. Missing bindings, backend, or hardware are normal
+        outcomes for this sample.
     """
     arguments_ = parse_arguments()
 
@@ -209,8 +200,7 @@ def main() -> int:
     while time.monotonic() < deadline_:
         frame_start_ = time.monotonic()
 
-        # A failed poll on an opened device means the pad went away, which this
-        # demo treats as a reason to stop rather than to retry.
+        # A failed poll after open() means the controller was detached.
         if not wrapper_.update():
             print(f"Controller detached after {poll_count_} polls; stopping.")
             break
@@ -228,8 +218,7 @@ def main() -> int:
         previous_states_ = current_states_
         poll_count_ += 1
 
-        # Sleep against the frame start so the cadence does not drift with the
-        # time spent polling and printing.
+        # Keep the poll cadence relative to the frame start.
         remaining_s_ = (frame_start_ + POLL_PERIOD_S) - time.monotonic()
         if remaining_s_ > 0.0:
             time.sleep(remaining_s_)

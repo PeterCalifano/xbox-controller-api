@@ -1,3 +1,8 @@
+/**
+ * @file xbox_controller_api_node_main.cpp
+ * @brief Starts the standalone controller lifecycle node.
+ */
+
 #include "xbox_controller_api_ros/CXboxControllerLifecycleNode.h"
 
 #include <rclcpp/executors/single_threaded_executor.hpp>

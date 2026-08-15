@@ -9,8 +9,7 @@ namespace xbox_controller_api
 {
     void CScriptedGamepadSource::pushFrame(const SGamepadState &strFrame)
     {
-        // Normalize the connection flag here so a caller cannot smuggle a
-        // detach through pushFrame() and bypass the disconnect contract.
+        // pushFrame() always represents a connected sample.
         SGamepadState strQueuedFrame_ = strFrame;
         strQueuedFrame_.bConnected_ = true;
 
@@ -42,8 +41,7 @@ namespace xbox_controller_api
         dequePendingFrames_.pop_front();
 
         // Consuming a frame is what advances script time, so the sequence id
-        // bumps for a disconnect frame too: the transition is observable data
-        // the consumer must be able to detect.
+        // Disconnect frames also advance the observable sequence number.
         ++ui64LastSequenceId_;
         strFrame_.ui64SequenceId_ = ui64LastSequenceId_;
 

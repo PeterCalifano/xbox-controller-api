@@ -1,8 +1,10 @@
 # ROS 2 Overlay
 
-The optional ROS 2 overlay is a colcon workspace layered on top of the C++-first template. The normal library entry point is still `./build_lib.sh`; it never needs ROS and never reads `ros2/`.
+The optional ROS 2 overlay is a colcon workspace layered on top of the
+C++-first library. The normal library entry point is still `./build_lib.sh`; it
+does not need ROS and does not read `ros2/`.
 
-## Encapsulation contract
+## Scope
 
 ROS integration lives in `ros2/` plus the root overlay helpers:
 
@@ -38,7 +40,8 @@ Core C++ unit tests remain Catch2-based. ROS package tests use
 `ament_cmake_gtest` as the narrow ROS-specific exception so ament registers and
 reports them through colcon.
 
-The bridge is intentionally source-adjacent: its private include path can reach core headers under the repository `src/` tree without making those headers part of the installed public API. A derived project should adapt `conversions.cpp` to use an exported public core header whenever one exists. An installed-only bridge consumer requires the core project to install/export that header first; the overlay does not turn private source headers into a public SDK.
+The bridge uses installed public core headers. A core header needed by a ROS
+translation unit must therefore be installed and exported by the library.
 
 ## Build usage
 
@@ -54,19 +57,24 @@ Source a ROS 2 environment, or let `build_ros2.sh` source `/opt/ros/${ROS_DISTRO
 
 The script defaults `ROS_DISTRO` to `jazzy`, but it is otherwise distro-agnostic when the requested distro is installed.
 
-The supplied standalone and composition launch files autostart the lifecycle node through `launch_ros`: they request configure, wait for the inactive state, then request activate. The service is therefore ready when either launch path finishes starting. Each launch file retains the equivalent plain `Node` or `ComposableNode` description as a commented template alternative. Uncomment that form only when an external lifecycle manager owns transitions; launching the raw executable, loading the raw component, or using those alternatives intentionally leaves the node unconfigured.
+The standalone and composition launch files configure and activate the lifecycle
+node through `launch_ros`. Both retain a commented plain-node alternative for
+use with an external lifecycle manager; that alternative does not autostart the
+node.
 
 Jazzy's current `ComposableLifecycleNode` implementation resolves the loaded component's fully qualified name inconsistently during autostart. The composition launch file supplies that identity to the lifecycle event manager locally; remove the compatibility adapter after the upstream `launch_ros` fix is available in the supported ROS distro.
 
 ## COLCON_IGNORE policy
 
-`COLCON_IGNORE` markers keep colcon from crawling template support trees that are not ROS packages:
+`COLCON_IGNORE` markers keep colcon from crawling directories that are not ROS
+packages:
 
 - `python/COLCON_IGNORE`: required because generated `setup.py` files can be misdetected as Python packages.
 - `lib/COLCON_IGNORE`: protects vendored submodules if they contain manifests.
 - `examples/COLCON_IGNORE` and `tests/COLCON_IGNORE`: avoid accidental package discovery in starter project code.
 
-There are no markers in `doc/`. Runtime-generated top-level directories such as `build*`, `install`, and `xbox_controller_api_subbuild` are handled best-effort by `build_ros2.sh` when they exist. This matters when the repository is placed inside a parent workspace: without the markers, a parent colcon crawl can discover unrelated template internals.
+There are no markers in `doc/`. When present, `build*`, `install`, and
+`xbox_controller_api_subbuild` are handled by `build_ros2.sh`.
 
 ## Project metadata sync
 
@@ -116,7 +124,7 @@ Run `./generate_version.sh` manually after changing root project metadata or tag
 before packaging source archives. Releases need the tag-safe preparation order
 described in [Release tagging with the ROS 2 overlay](versioning.md#release-tagging-with-the-ros-2-overlay).
 
-## Adaptation seam
+## Joy bridge
 
 The overlay publishes an attached controller as the standard
 `sensor_msgs/msg/Joy` on `~/joy`, which is what lets `teleop_twist_joy`,
@@ -129,25 +137,20 @@ ros2/xbox_controller_api_ros/src/joy_conversion.cpp
 ros2/xbox_controller_api_ros/src/CXboxControllerLifecycleNode.cpp
 ```
 
-`joy_conversion.cpp` turns an `SGamepadState` into a `Joy` message and is
-deliberately free of rclcpp, so it stays unit testable without a ROS context or
-a controller. It leaves the header stamp unset, because snapshot timestamps come
-from a steady clock with an arbitrary epoch and only the node can supply a ROS
-time.
+`joy_conversion.cpp` turns an `SGamepadState` into a `Joy` message without
+depending on rclcpp, so it can be tested without a ROS context or controller.
+It leaves the stamp unset because snapshot timestamps use a steady clock; the
+node supplies ROS time before publication.
 
-`CXboxControllerLifecycleNode.cpp` owns the device and the poll timer. Its
-lifecycle states map onto the library's explicit device contract: configure
-allocates the publisher without touching hardware, activate opens the device and
-fails when none is available, and deactivate closes it. A detach stops
-publication rather than reconnecting, so a deactivate/activate cycle is the
-documented recovery.
+`CXboxControllerLifecycleNode.cpp` owns the device and poll timer. Configuration
+creates the publisher without accessing hardware, activation opens the device,
+and deactivation closes it. A detach stops publication; deactivate and activate
+the node to reconnect.
 
-Everything is consumed through installed public headers, so the overlay
-exercises the exported package rather than the source tree. Any new header a ROS
-translation unit needs must therefore be installed, not merely present under
-`src/`. The overlay forces `ENABLE_SDL2=ON` and `ENABLE_SDL2_STRICT=ON`, since a
-node that publishes controller data has no use for a stubbed backend; that makes
-`libsdl2-dev` a build requirement for the overlay.
+The overlay uses installed public headers. Any core header needed by a ROS
+translation unit must be installed, not merely present under `src/`. The overlay
+forces `ENABLE_SDL2=ON` and `ENABLE_SDL2_STRICT=ON`, making `libsdl2-dev` a
+build requirement.
 
 After changing any of this, run `./build_ros2.sh --clean`. A plain incremental
 build reuses a cached source list, because the core's source globs do not use

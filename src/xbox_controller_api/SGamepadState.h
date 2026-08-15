@@ -1,10 +1,8 @@
 /**
  * @file SGamepadState.h
  * @brief Backend-independent snapshot of one xpad-class controller poll.
- * @details Declares the normalized value contract that every gamepad source
- *          publishes. Hardware axis ranges, button numbering, and mapping
- *          databases stay inside the backend that produced the sample, so
- *          consumers depend on this header alone.
+ * @details Hardware-specific mapping stays in each backend. This type exposes
+ *          the normalized values shared by every source.
  */
 #pragma once
 
@@ -15,18 +13,15 @@ namespace xbox_controller_api
     /**
      * @brief One complete, normalized controller sample.
      *
-     * The type is a plain aggregate because it carries no invariant beyond the
-     * per-field ranges documented below: it is a value snapshot, not an owner of
-     * state. A default-constructed instance is the canonical "nothing read yet"
-     * sample, with every axis at rest and @ref bConnected_ false.
+     * This plain aggregate represents one sample. A default-constructed value
+     * has every control at rest and @ref bConnected_ set to false.
      *
-     * Axis conventions, which deviate deliberately from the raw SDL layout:
+     * Axis conventions:
      * - Stick axes lie in [-1, 1]. X grows to the right and **Y grows up**, so a
      *   forward push on either stick yields a positive value. Backends negate
      *   the down-positive raw hardware Y to honor this.
      * - Trigger axes lie in [0, 1], with 0 fully released.
-     * - No deadzone is applied here. Values are raw-but-normalized, and any
-     *   deadzone is an explicit consumer-side decision (see GamepadFilters.h).
+     * - No deadzone is applied here; use GamepadFilters.h when needed.
      */
     struct SGamepadState
     {
@@ -82,10 +77,8 @@ namespace xbox_controller_api
     /**
      * @brief Build the canonical snapshot published when no device is attached.
      *
-     * This is the single authoritative definition of the disconnect contract:
-     * every axis and button is forced to rest and @ref SGamepadState::bConnected_
-     * to false, so a consumer that ignores the connection flag still sees a
-     * neutral, safe command rather than the last value read before the unplug.
+     * Every axis and button is reset to rest and
+     * bConnected_ is set to false.
      *
      * @param ui64SequenceId Sequence number to stamp on the disconnect sample.
      * @param ui64TimestampNs Steady-clock capture time in nanoseconds.

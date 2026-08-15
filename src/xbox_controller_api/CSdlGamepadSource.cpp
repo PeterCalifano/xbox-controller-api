@@ -1,10 +1,8 @@
 /**
  * @file CSdlGamepadSource.cpp
  * @brief Implements the SDL2-backed gamepad source and its no-backend stub.
- * @details The file compiles in two shapes selected by __SDL2_ENABLED__, which
- *          the SDL2 interface target defines when the dependency was resolved.
- *          Both shapes define every method, so the class contract is identical
- *          in either configuration and only the outcomes differ.
+ * @details __SDL2_ENABLED__ selects either the SDL2 implementation or the
+ *          no-backend stub. Both provide the same public methods.
  */
 
 #include <xbox_controller_api/CSdlGamepadSource.h>
@@ -25,8 +23,7 @@ namespace xbox_controller_api
 {
     namespace
     {
-        /// Fixed diagnostic reported by open() when the backend was compiled out.
-        /// Consumers branch on isBackendAvailable() rather than parsing this.
+        /// @brief Diagnostic reported when this build has no SDL2 backend.
         constexpr const char *charBackendUnavailableMessage =
             "SDL2 backend is not compiled into this build (ENABLE_SDL2 was OFF at configure time)";
 
@@ -74,10 +71,7 @@ namespace xbox_controller_api
         {
             const std::int32_t i32DeviceCount_ = SDL_NumJoysticks();
 
-            // Version 1 policy: an unspecified index attaches to the
-            // lowest-numbered device SDL recognizes as a game controller, since
-            // that is the only kind whose button mapping is reliable. An
-            // explicit index is the extension seam for multi-pad setups.
+            // Select the first SDL game controller when no index was requested.
             if (i32RequestedIndex < 0)
             {
                 for (std::int32_t i32Index_ = 0; i32Index_ < i32DeviceCount_; ++i32Index_)
@@ -103,8 +97,7 @@ namespace xbox_controller_api
         /**
          * @brief Build a normalized snapshot from the current device state.
          *
-         * No deadzone or edge detection is applied: the backend reports what the
-         * hardware said, and shaping stays an explicit consumer decision.
+         * The backend reports normalized hardware values without conditioning.
          */
         [[nodiscard]] SGamepadState ReadControllerState(SDL_GameController &objController,
                                                         std::uint64_t ui64SequenceId,
@@ -112,8 +105,7 @@ namespace xbox_controller_api
         {
             SGamepadState strState_;
 
-            // SDL reports stick Y as positive downward. The library contract is
-            // up = +1, so the two Y axes, and only those, are inverted here.
+            // Convert SDL's down-positive Y axes to the library's up-positive convention.
             strState_.dLeftStickX_ = ReadStickAxis(objController, SDL_CONTROLLER_AXIS_LEFTX);
             strState_.dLeftStickY_ = InvertAxis(ReadStickAxis(objController,
                                                              SDL_CONTROLLER_AXIS_LEFTY));
@@ -156,8 +148,7 @@ namespace xbox_controller_api
     /**
      * @brief Private state, kept out of the header so SDL types never leak.
      *
-     * The SDL members exist only in a build that has the backend, which is what
-     * allows the stub configuration to compile without SDL headers at all.
+     * SDL members exist only when the backend is enabled.
      */
     struct CSdlGamepadSource::SImpl
     {
@@ -171,16 +162,14 @@ namespace xbox_controller_api
         /// True while this instance holds one SDL_InitSubSystem reference.
         bool bHoldsSubsystemRef_ = false;
 
-        /// True when this instance was the first to start the subsystem, which
-        /// is what makes it safe to set hints and flush device events.
+        /// True when this instance started the subsystem.
         bool bStartedSubsystem_ = false;
 #endif
     };
 
     CSdlGamepadSource::CSdlGamepadSource() : pImpl_(std::make_unique<SImpl>())
     {
-        // Deliberately free of SDL calls: initialization is deferred to open()
-        // so constructing a source in a headless process is always safe.
+        // Defer SDL initialization until a controller is opened.
         pImpl_->objLogger_.setLevelFromEnvironment();
     }
 
@@ -210,8 +199,7 @@ namespace xbox_controller_api
 
     bool CSdlGamepadSource::open(std::int32_t i32JoystickIndex)
     {
-        // open() is also the documented reconnection path, so release any
-        // previous device first instead of leaking it.
+        // Reopening replaces any previously attached controller.
         close();
         pImpl_->charLastError_.clear();
 
@@ -223,9 +211,7 @@ namespace xbox_controller_api
 
         return false;
 #else
-        // SDL_InitSubSystem is reference counted. Record whether this call is
-        // the first initializer, because hints only take effect before the
-        // subsystem starts and must not override a host application's setup.
+        // Set hints only when this instance initializes the subsystem first.
         const bool bIsFirstInitializer_ = (SDL_WasInit(SDL_INIT_GAMECONTROLLER) == 0U);
 
         if (bIsFirstInitializer_)
@@ -275,17 +261,14 @@ namespace xbox_controller_api
         const char *charDeviceName_ = SDL_GameControllerName(pGameController_);
         pImpl_->charDeviceName_ = (charDeviceName_ != nullptr) ? charDeviceName_ : "Unknown controller";
 
-        // This instance never consumes the event queue, so discard the
-        // device-added events our own initialization generated. Doing so is only
-        // safe when nobody else owns the queue.
+        // Discard device-added events only when this instance owns the queue.
         if (pImpl_->bStartedSubsystem_)
         {
             SDL_FlushEvent(SDL_JOYDEVICEADDED);
             SDL_FlushEvent(SDL_CONTROLLERDEVICEADDED);
         }
 
-        // Publish a first snapshot so state() is meaningful before the caller
-        // reaches its first update().
+        // Publish the initial controller state.
         setState(ReadControllerState(*pGameController_, state().ui64SequenceId_ + 1U,
                                      ReadSteadyClockNs()));
 
@@ -305,8 +288,7 @@ namespace xbox_controller_api
             pImpl_->pGameController_ = nullptr;
         }
 
-        // Balance every successful SDL_InitSubSystem exactly once, so a host
-        // application's own reference count survives this teardown.
+        // Balance this instance's SDL_InitSubSystem call.
         if (pImpl_->bHoldsSubsystemRef_)
         {
             SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
@@ -318,8 +300,7 @@ namespace xbox_controller_api
 
         pImpl_->charDeviceName_.clear();
 
-        // Publish the neutral snapshot only when something was attached, which
-        // keeps repeated close() calls observably identical.
+        // Publish a neutral snapshot after disconnecting an attached controller.
         if (connected())
         {
             setState(MakeDisconnectedState(state().ui64SequenceId_ + 1U, ReadSteadyClockNs()));
@@ -336,22 +317,16 @@ namespace xbox_controller_api
             return false;
         }
 
-        // Poll rather than pump: SDL_GameControllerUpdate refreshes device state
-        // without consuming events that a host application may own.
+        // Refresh state without consuming the host application's event queue.
         SDL_GameControllerUpdate();
 
-        // The refresh above queues joystick and controller events that this
-        // instance never consumes, so a long session would otherwise fill the
-        // capped queue. Discarding them is only safe when we started the
-        // subsystem, i.e. nobody else owns the queue; it is a no-op when empty.
+        // Prevent a privately owned event queue from accumulating poll events.
         if (pImpl_->bStartedSubsystem_)
         {
             SDL_FlushEvents(SDL_JOYAXISMOTION, SDL_CONTROLLERSENSORUPDATE);
         }
 
-        // A detach is reported once and then left to the caller, since recovery
-        // requires an explicit open(). Publishing and logging only on the
-        // transition also keeps a disconnected poll loop free of per-frame spam.
+        // Publish and log the disconnect once; reopening is caller-controlled.
         if (SDL_GameControllerGetAttached(pImpl_->pGameController_) != SDL_TRUE)
         {
             if (connected())

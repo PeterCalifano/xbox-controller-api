@@ -1,9 +1,6 @@
 /**
  * @file GamepadFilters.cpp
- * @brief Implements the pure conditioning helpers and the disconnect contract.
- * @details MakeDisconnectedState is hosted here so SGamepadState.h can stay
- *          header-only, rather than gaining a dedicated translation unit that
- *          would hold a single function.
+ * @brief Implements the conditioning helpers and disconnect snapshot factory.
  */
 
 #include <xbox_controller_api/GamepadFilters.h>
@@ -25,9 +22,7 @@ namespace xbox_controller_api
     SGamepadState MakeDisconnectedState(std::uint64_t ui64SequenceId,
                                         std::uint64_t ui64TimestampNs) noexcept
     {
-        // Value-initialize rather than assigning field by field, so any field
-        // added to the aggregate later is covered by the disconnect contract
-        // without a matching edit here.
+        // Value initialization resets any future fields to their rest values.
         SGamepadState strDisconnectedState_{};
         strDisconnectedState_.ui64SequenceId_ = ui64SequenceId;
         strDisconnectedState_.ui64TimestampNs_ = ui64TimestampNs;
@@ -78,8 +73,7 @@ namespace xbox_controller_api
 
     double NormalizeTriggerAxis(std::int16_t i16RawAxis) noexcept
     {
-        // Triggers are unidirectional, so a negative reading means "released"
-        // rather than "pulled the other way".
+        // Negative trigger readings represent the released position.
         const double dRawValue_ = static_cast<double>(i16RawAxis);
 
         return std::clamp(dRawValue_ / dAxisPositiveFullScale, 0.0, 1.0);

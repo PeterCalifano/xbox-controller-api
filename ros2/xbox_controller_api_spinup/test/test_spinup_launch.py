@@ -1,10 +1,4 @@
-"""Launch-level checks that the overlay starts and publishes controller data.
-
-Nothing here asserts that a controller is attached. Activation legitimately
-fails on a machine with no device, so each launch path is required to settle in
-a defined lifecycle state, and the Joy contract is checked only when the node
-actually reached the active state.
-"""
+"""Check that each launch path reaches a valid lifecycle state and publishes Joy."""
 
 import time
 import unittest
@@ -23,7 +17,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
 
-# Axis and button counts published by the node, mirroring the C++ contract.
+# Axis and button counts defined by the Joy bridge.
 EXPECTED_AXIS_COUNT = 6
 EXPECTED_BUTTON_COUNT = 15
 
@@ -81,12 +75,7 @@ class TestSpinupLaunch(unittest.TestCase):
         charCase_: str,
         dTimeoutSec_: float = 10.0,
     ) -> int:
-        """Return the lifecycle state the node settles in.
-
-        Autostart drives configure and then activate. Activation fails when no
-        controller is present, which leaves the node inactive rather than
-        active, so both outcomes are accepted and returned to the caller.
-        """
+        """Return the active state, or the inactive state when no controller is present."""
         objStateClient_ = self.objNode_.create_client(
             GetState,
             f"{charNodePath_}/get_state",
@@ -129,8 +118,7 @@ class TestSpinupLaunch(unittest.TestCase):
         uiState_ = self._waitForSettledState(charNodePath_, charCase_)
 
         if uiState_ != State.PRIMARY_STATE_ACTIVE:
-            # No controller on this machine: the launch path is still proven to
-            # come up and configure, which is what this test can guarantee.
+            # A missing controller leaves the node configured but inactive.
             self.skipTest(f"Node is inactive, so no controller is attached for {charCase_}")
 
         listJoyMessages_: list[Joy] = []
@@ -156,8 +144,7 @@ class TestSpinupLaunch(unittest.TestCase):
                 f"Joy stamp was not populated for {charCase_}",
             )
 
-            # Values must satisfy the documented normalized ranges whatever the
-            # sticks happen to be doing while the test runs.
+            # Joy values must remain within the normalized controller ranges.
             for dAxis_ in objJoy_.axes[:4]:
                 self.assertGreaterEqual(dAxis_, -1.0, charCase_)
                 self.assertLessEqual(dAxis_, 1.0, charCase_)

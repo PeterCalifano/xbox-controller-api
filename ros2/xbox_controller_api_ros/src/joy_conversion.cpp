@@ -1,3 +1,8 @@
+/**
+ * @file joy_conversion.cpp
+ * @brief Implements conversion from controller snapshots to Joy messages.
+ */
+
 #include "xbox_controller_api_ros/joy_conversion.h"
 
 #include <xbox_controller_api/GamepadControls.h>
@@ -10,7 +15,7 @@ sensor_msgs::msg::Joy MakeJoyMessage(
   sensor_msgs::msg::Joy objJoy_;
   objJoy_.header.frame_id = charFrameId;
 
-  // Axis order is fixed by EJoyAxis so subscribers can index positionally.
+  // Keep the documented EJoyAxis order in the published message.
   objJoy_.axes.resize(kJoyAxisCount);
   objJoy_.axes[static_cast<std::size_t>(EJoyAxis::LeftStickX)] =
       static_cast<float>(strGamepadState.dLeftStickX_);
@@ -25,8 +30,7 @@ sensor_msgs::msg::Joy MakeJoyMessage(
   objJoy_.axes[static_cast<std::size_t>(EJoyAxis::RightTrigger)] =
       static_cast<float>(strGamepadState.dRightTrigger_);
 
-  // Driven by the library control list, so a control added there appears here
-  // without editing this function, and the index order stays the documented one.
+  // Use the library's stable control order for Joy buttons.
   const auto spanButtons_ = xbox_controller_api::AllGamepadButtons();
   objJoy_.buttons.reserve(spanButtons_.size());
   for (const xbox_controller_api::EGamepadButton enumButton_ : spanButtons_) {

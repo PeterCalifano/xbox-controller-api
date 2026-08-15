@@ -22,9 +22,9 @@ Xbox pad → kernel xpad → SDL2 GameController (mapping DB)
         consumers: C++ app | CGamepadWrapper → Python | ROS node | viewer
 ```
 
-Each layer depends only inward. Conditioning is never applied by the backend:
-a snapshot carries what the hardware reported, and any deadzone or edge
-detection is an explicit consumer decision.
+Each consumer depends on the core library, not on another consumer. The backend
+publishes normalized hardware values; applications apply deadzones and edge
+detection when needed.
 
 ## Linux setup
 
@@ -38,7 +38,7 @@ ls -l /dev/input/by-id/ | grep -i controller
 ```
 
 A wired Xbox 360 pad appears as a pair of nodes, for example
-`usb-©Microsoft_Corporation_Controller_...-event-joystick` and
+`usb-Microsoft_Corporation_Controller_...-event-joystick` and
 `...-joystick`. To watch raw events before involving this library:
 
 ```bash
@@ -102,10 +102,9 @@ caller owns the poll cadence.
 | `ui64TimestampNs_` | `uint64` | Steady-clock capture time; only differences are meaningful |
 
 **The Y axis is inverted relative to SDL.** SDL reports stick Y as positive
-downward. This library reports positive upward, so a forward push yields a
-positive value and the sign matches the usual convention for a velocity or
-attitude command. The backend applies `InvertAxis` to the two Y axes and to
-nothing else. Code ported from raw SDL must drop its own negation.
+downward; this library reports it as positive upward. The backend applies
+`InvertAxis` to the two Y axes. Code ported from raw SDL must not negate them a
+second time.
 
 The negative extreme of a raw 16-bit axis is `-32768`, one count larger in
 magnitude than the positive extreme `32767`. Normalization scales by the
@@ -163,17 +162,15 @@ output(x, d) =
                 0                                 for |x| ≤ d
 ```
 
-Rescaling matters. A bare cut-off leaves the axis unable to reach full
-deflection and makes the response jump as the stick crosses the threshold; this
-form is continuous at the boundary and still reaches `±1.0`.
+Rescaling keeps the response continuous at the boundary and preserves full
+deflection.
 
-Edge cases are defined rather than rejected: `d ≤ 0` clamps only, and `d ≥ 1`
-suppresses the axis entirely.
+For `d ≤ 0`, the helper only clamps the input. For `d ≥ 1`, it suppresses the
+axis entirely.
 
-**The default is 0.0 everywhere** — a pass-through — so the library never
-reshapes input that was not asked for. A useful starting value is **0.10 to
-0.20**; measure your own device with `xbox_controller_monitor`, which
-deliberately reports unconditioned values so drift stays visible.
+**The default is 0.0**, which passes values through unchanged. Start with a
+value between **0.10 and 0.20**, then measure your device with
+`xbox_controller_monitor`, which reports unconditioned values.
 
 Condition a whole snapshot once per sample rather than per read:
 
@@ -181,21 +178,17 @@ Condition a whole snapshot once per sample rather than per read:
 const SGamepadState strConditioned = ApplyStickDeadzone(objSource.state(), 0.15);
 ```
 
-Triggers are never deadzoned by this helper. They are unidirectional, so
-suppressing a light pull is a separate decision belonging to the caller.
+This helper does not alter triggers. Apply any trigger threshold separately.
 
 ## Disconnect and reconnect
 
-A hot unplug is reported, never healed:
+When a controller is unplugged:
 
 - `update()` publishes the canonical zeroed snapshot once and returns false.
-- `state()` then reports every axis at rest and `bConnected_` false, so a
-  consumer that ignores the connection flag still receives a neutral command
-  instead of the last value read before the unplug.
+- `state()` then reports every axis at rest and `bConnected_` false.
 - Subsequent `update()` calls keep returning false without republishing.
 
-Recovery is an explicit `open()`. The library does not reconnect on its own,
-because retry timing is a policy only the application can choose.
+Call `open()` to reconnect. The library does not retry automatically.
 
 `close()` is safe to call at any time, is idempotent, and publishes the same
 neutral snapshot when a device was attached.
@@ -206,12 +199,11 @@ The backend never pumps or consumes the SDL event queue. It refreshes state
 with `SDL_GameControllerUpdate()`, so an application running its own
 `SDL_PollEvent` loop keeps every event it would otherwise have lost.
 
-Supporting details:
+When an application also owns SDL:
 
 - `SDL_InitSubSystem` is reference counted, and the source releases exactly the
   reference it took.
-- Hints are set only when the source is the first initializer, so a host
-  application's deliberate configuration is never overridden.
+- Hints are set only when the source initializes SDL first.
 - Device-added events are flushed only when the source started the subsystem.
 
 One source instance must be used from a single thread. SDL's game controller
@@ -247,11 +239,9 @@ else:
     print("no controller:", wrapper.lastError())
 ```
 
-`CGamepadWrapper` is a flat facade: no overloads, one accessor per control, and
-`openIndex()` in place of an overloaded `open()`, because the binding generator
-handles neither overloads nor aggregate references. It caches one conditioned
-snapshot per poll, so every accessor reports a consistent view of the same
-sample and the deadzone is applied once rather than per read.
+`CGamepadWrapper` provides one accessor per control and `openIndex()` instead
+of an overloaded `open()`, which keeps the generated bindings simple. It caches
+one conditioned snapshot per poll, so every accessor refers to the same sample.
 
 ## Builds without SDL2
 
@@ -259,8 +249,7 @@ sample and the deadzone is applied once rather than per read.
 configure warns and stubs the backend out; `ENABLE_SDL2_STRICT=ON` turns the
 same situation into a configure error, which is what CI uses.
 
-The class and its full API survive either way, so consumers branch on a value
-rather than on a preprocessor symbol:
+The class remains available in either build configuration:
 
 - `CSdlGamepadSource::isBackendAvailable()` returns false.
 - `open()` returns false and sets a fixed diagnostic in `lastError()`.
@@ -304,12 +293,11 @@ is the same stable contract documented above.
 | `stick_deadzone` | `0.0` | Deadzone applied to sticks before publishing |
 | `frame_id` | `xbox_controller` | Frame id placed in the message header |
 
-The node is a lifecycle node, and its states map onto the device contract:
-`on_configure` reads parameters and creates the publisher without touching
-hardware; `on_activate` opens the device and starts the timer, **failing when no
-controller is available**; `on_deactivate` stops the timer and closes the
-device. A detach publishes the neutral snapshot once, stops publication, and
-logs — recovery is a deactivate/activate cycle, never an automatic reconnect.
+The node is a lifecycle node. `on_configure` reads parameters and creates the
+publisher without opening hardware. `on_activate` opens the controller and
+starts the timer; it fails when no controller is available. `on_deactivate`
+stops the timer and closes the device. A detach publishes one neutral message,
+then stops publication until the node is deactivated and activated again.
 
 ## Testing without hardware
 
@@ -332,10 +320,9 @@ while (objSource.pendingFrameCount() > 0U)
 }
 ```
 
-`pushFrame()` always represents an attached device and `pushDisconnect()` is the
-only way to express a detach, so the disconnect contract has exactly one entry
-point. An exhausted script returns false but leaves the last snapshot standing,
-which is how "no new data" stays distinguishable from "device gone".
+`pushFrame()` represents an attached device and `pushDisconnect()` represents a
+detach. An exhausted script returns false but leaves the last snapshot intact,
+which distinguishes "no new data" from "device gone".
 
 ## Running the examples
 

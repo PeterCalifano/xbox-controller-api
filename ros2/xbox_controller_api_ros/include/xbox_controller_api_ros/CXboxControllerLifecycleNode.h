@@ -1,3 +1,8 @@
+/**
+ * @file CXboxControllerLifecycleNode.h
+ * @brief Declares the lifecycle node that publishes controller input as Joy.
+ */
+
 #pragma once
 
 #include "xbox_controller_api_ros/joy_conversion.h"
@@ -15,28 +20,34 @@ namespace xbox_controller_api_ros {
 
 /// @brief Publishes an attached controller as sensor_msgs/Joy.
 ///
-/// The lifecycle states map onto the library's explicit device contract:
-///
-/// - on_configure allocates the publisher and reads parameters. It performs no
-///   device access, so configuring is safe on a machine with no controller.
-/// - on_activate opens the device and starts the poll timer. Activation fails
-///   when no controller is available, which is the honest signal for "cannot
-///   start publishing".
-/// - on_deactivate stops the timer and closes the device.
-///
-/// The library never reconnects on its own, so a detach stops publication and
-/// recovery is a deactivate/activate cycle driven by an operator or a lifecycle
-/// manager. That keeps retry policy outside this node.
+/// Configuration reads parameters and creates the publisher without accessing
+/// hardware. Activation opens the controller and starts polling; deactivation
+/// stops polling and closes the device. A disconnect stops publication until a
+/// lifecycle manager deactivates and activates the node again.
 class CXboxControllerLifecycleNode final : public rclcpp_lifecycle::LifecycleNode {
  public:
+  /// @brief Construct a node with optional ROS node options.
+  /// @param objOptions ROS options used to construct the lifecycle node.
   explicit CXboxControllerLifecycleNode(const rclcpp::NodeOptions& objOptions_ = rclcpp::NodeOptions());
 
+  /// @brief Read parameters and create the inactive Joy publisher.
+  /// @param objPreviousState Lifecycle state being left.
+  /// @return Success when all parameters are valid and the publisher is created.
   rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn on_configure(
       const rclcpp_lifecycle::State& objPreviousState_) override;
+  /// @brief Open the controller and start the polling timer.
+  /// @param objPreviousState Lifecycle state being left.
+  /// @return Success when the controller opens; failure otherwise.
   rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn on_activate(
       const rclcpp_lifecycle::State& objPreviousState_) override;
+  /// @brief Stop polling and release the controller.
+  /// @param objPreviousState Lifecycle state being left.
+  /// @return Success after stopping the timer and closing the controller.
   rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn on_deactivate(
       const rclcpp_lifecycle::State& objPreviousState_) override;
+  /// @brief Release lifecycle resources after deactivation.
+  /// @param objPreviousState Lifecycle state being left.
+  /// @return Success after releasing the publisher and timer.
   rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn on_cleanup(
       const rclcpp_lifecycle::State& objPreviousState_) override;
 
@@ -46,8 +57,7 @@ class CXboxControllerLifecycleNode final : public rclcpp_lifecycle::LifecycleNod
 
   /// @brief Build a Joy message and stamp it with the current ROS time.
   ///
-  /// Snapshot timestamps come from a steady clock with an arbitrary epoch, so
-  /// the ROS stamp is taken here rather than converted from the sample.
+  /// Snapshot timestamps use a steady clock, so the node supplies ROS time.
   sensor_msgs::msg::Joy makeStampedJoyMessage(
       const xbox_controller_api::SGamepadState& strGamepadState);
 
