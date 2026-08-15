@@ -13,6 +13,7 @@
 
 #include <utils/logging/CLogger.h>
 #include <xbox_controller_api/CSdlGamepadSource.h>
+#include <xbox_controller_api/GamepadControls.h>
 #include <xbox_controller_api/GamepadFilters.h>
 #include <xbox_controller_api/SGamepadState.h>
 
@@ -25,9 +26,12 @@
 
 namespace
 {
+    using xbox_controller_api::AllGamepadButtons;
     using xbox_controller_api::ClassifyButtonEdge;
     using xbox_controller_api::CSdlGamepadSource;
     using xbox_controller_api::EButtonEdge;
+    using xbox_controller_api::EGamepadButton;
+    using xbox_controller_api::GetGamepadButtonName;
     using xbox_controller_api::SGamepadState;
     using xbox_controller_api::logging::CLogger;
 
@@ -77,34 +81,6 @@ namespace
         }
     }
 
-    /// @brief One button of the snapshot, paired with its display name.
-    struct SNamedButton
-    {
-        const char *charName_;
-        bool SGamepadState::*pPressedMember_;
-    };
-
-    // TODO This table is the third copy of the same control mapping, after
-    // example_read_controller.cpp and its Python sibling. It belongs in the
-    // library as an enumeration plus lookup, and should be deleted from all
-    // three consumers once that exists.
-    constexpr SNamedButton arrTrackedButtons[] = {
-        {"A", &SGamepadState::bButtonA_},
-        {"B", &SGamepadState::bButtonB_},
-        {"X", &SGamepadState::bButtonX_},
-        {"Y", &SGamepadState::bButtonY_},
-        {"LB", &SGamepadState::bLeftShoulder_},
-        {"RB", &SGamepadState::bRightShoulder_},
-        {"LS", &SGamepadState::bLeftStickClick_},
-        {"RS", &SGamepadState::bRightStickClick_},
-        {"Back", &SGamepadState::bBack_},
-        {"Start", &SGamepadState::bStart_},
-        {"Guide", &SGamepadState::bGuide_},
-        {"DpadUp", &SGamepadState::bDpadUp_},
-        {"DpadDown", &SGamepadState::bDpadDown_},
-        {"DpadLeft", &SGamepadState::bDpadLeft_},
-        {"DpadRight", &SGamepadState::bDpadRight_}};
-
     /// @brief Log every button that changed between two consecutive samples.
     /// @return True when at least one transition was reported.
     bool ReportButtonEdges(CLogger &objLogger,
@@ -113,11 +89,12 @@ namespace
     {
         bool bReportedAny_ = false;
 
-        for (const SNamedButton &strButton : arrTrackedButtons)
+        // Driven by the library's control list, so a control added there is
+        // reported here without touching this loop.
+        for (const EGamepadButton enumButton_ : AllGamepadButtons())
         {
             const EButtonEdge enumEdge_ =
-                ClassifyButtonEdge(strPreviousState.*strButton.pPressedMember_,
-                                   strCurrentState.*strButton.pPressedMember_);
+                ClassifyButtonEdge(strPreviousState, strCurrentState, enumButton_);
 
             if (enumEdge_ != EButtonEdge::Pressed && enumEdge_ != EButtonEdge::Released)
             {
@@ -125,7 +102,7 @@ namespace
             }
 
             objLogger.info("Sample ", strCurrentState.ui64SequenceId_, ": button ",
-                           strButton.charName_, " ",
+                           GetGamepadButtonName(enumButton_), " ",
                            (enumEdge_ == EButtonEdge::Pressed) ? "pressed" : "released");
             bReportedAny_ = true;
         }

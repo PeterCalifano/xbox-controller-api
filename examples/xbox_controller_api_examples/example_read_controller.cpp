@@ -11,6 +11,7 @@
 ///     ./example_read_controller [runtime_seconds]
 
 #include <xbox_controller_api/CSdlGamepadSource.h>
+#include <xbox_controller_api/GamepadControls.h>
 #include <xbox_controller_api/GamepadFilters.h>
 #include <xbox_controller_api/SGamepadState.h>
 
@@ -23,9 +24,13 @@
 
 namespace
 {
+    using xbox_controller_api::AllGamepadButtons;
+    using xbox_controller_api::ApplyStickDeadzone;
     using xbox_controller_api::ClassifyButtonEdge;
     using xbox_controller_api::CSdlGamepadSource;
     using xbox_controller_api::EButtonEdge;
+    using xbox_controller_api::EGamepadButton;
+    using xbox_controller_api::GetGamepadButtonName;
     using xbox_controller_api::SGamepadState;
 
     /// Poll period corresponding to the 50 Hz sampling rate of the demo.
@@ -42,32 +47,6 @@ namespace
 
     /// Print the axis summary at 5 Hz rather than at the full poll rate.
     constexpr int i32AxisPrintDecimation = 10;
-
-    /// @brief One button of the snapshot, paired with its display name.
-    struct SNamedButton
-    {
-        const char *charName_;
-        bool SGamepadState::*pPressedMember_;
-    };
-
-    // A member-pointer table keeps the edge loop independent of the button
-    // count: adding a control later means adding one row, not another branch.
-    constexpr SNamedButton arrTrackedButtons[] = {
-        {"A", &SGamepadState::bButtonA_},
-        {"B", &SGamepadState::bButtonB_},
-        {"X", &SGamepadState::bButtonX_},
-        {"Y", &SGamepadState::bButtonY_},
-        {"LB", &SGamepadState::bLeftShoulder_},
-        {"RB", &SGamepadState::bRightShoulder_},
-        {"LS", &SGamepadState::bLeftStickClick_},
-        {"RS", &SGamepadState::bRightStickClick_},
-        {"Back", &SGamepadState::bBack_},
-        {"Start", &SGamepadState::bStart_},
-        {"Guide", &SGamepadState::bGuide_},
-        {"DpadUp", &SGamepadState::bDpadUp_},
-        {"DpadDown", &SGamepadState::bDpadDown_},
-        {"DpadLeft", &SGamepadState::bDpadLeft_},
-        {"DpadRight", &SGamepadState::bDpadRight_}};
 
     /// @brief Read an optional positive runtime in seconds from the arguments.
     [[nodiscard]] int ParseRuntimeSeconds(int argc, char **argv)
@@ -99,55 +78,49 @@ namespace
     /// @brief Print every button that changed between two consecutive samples.
     void PrintButtonEdges(const SGamepadState &strPreviousState, const SGamepadState &strCurrentState)
     {
-        for (const SNamedButton &strButton_ : arrTrackedButtons)
+        // Driven by the library's control list, so this loop needs no knowledge
+        // of how many controls exist or where they live in the snapshot.
+        for (const EGamepadButton enumButton_ : AllGamepadButtons())
         {
             const EButtonEdge enumEdge_ =
-                ClassifyButtonEdge(strPreviousState.*strButton_.pPressedMember_,
-                                   strCurrentState.*strButton_.pPressedMember_);
+                ClassifyButtonEdge(strPreviousState, strCurrentState, enumButton_);
 
             // Only transitions are interesting; Held and None would repeat at
             // the poll rate and drown out everything else.
             if (enumEdge_ == EButtonEdge::Pressed)
             {
                 std::cout << "  [" << strCurrentState.ui64SequenceId_ << "] "
-                          << strButton_.charName_ << " pressed\n";
+                          << GetGamepadButtonName(enumButton_) << " pressed\n";
             }
             else if (enumEdge_ == EButtonEdge::Released)
             {
                 std::cout << "  [" << strCurrentState.ui64SequenceId_ << "] "
-                          << strButton_.charName_ << " released\n";
+                          << GetGamepadButtonName(enumButton_) << " released\n";
             }
         }
     }
 
-    /// @brief Report whether any conditioned axis has left its rest position.
-    [[nodiscard]] bool HasAxisActivity(const SGamepadState &strState) noexcept
+    /// @brief Report whether any axis of a conditioned sample is deflected.
+    [[nodiscard]] bool HasAxisActivity(const SGamepadState &strConditionedState) noexcept
     {
-        using xbox_controller_api::ApplyRescaledDeadzone;
-
-        const bool bStickActive_ = std::abs(ApplyRescaledDeadzone(strState.dLeftStickX_,
-                                                                  dDisplayDeadzone)) > 0.0 ||
-                                   std::abs(ApplyRescaledDeadzone(strState.dLeftStickY_,
-                                                                  dDisplayDeadzone)) > 0.0 ||
-                                   std::abs(ApplyRescaledDeadzone(strState.dRightStickX_,
-                                                                  dDisplayDeadzone)) > 0.0 ||
-                                   std::abs(ApplyRescaledDeadzone(strState.dRightStickY_,
-                                                                  dDisplayDeadzone)) > 0.0;
-
-        return bStickActive_ || strState.dLeftTrigger_ > 0.0 || strState.dRightTrigger_ > 0.0;
+        // The caller conditions the whole snapshot once per poll, so this reads
+        // already-shaped values instead of re-running the deadzone per axis.
+        return std::abs(strConditionedState.dLeftStickX_) > 0.0 ||
+               std::abs(strConditionedState.dLeftStickY_) > 0.0 ||
+               std::abs(strConditionedState.dRightStickX_) > 0.0 ||
+               std::abs(strConditionedState.dRightStickY_) > 0.0 ||
+               strConditionedState.dLeftTrigger_ > 0.0 || strConditionedState.dRightTrigger_ > 0.0;
     }
 
-    /// @brief Print the conditioned stick and trigger values on one line.
-    void PrintAxes(const SGamepadState &strState)
+    /// @brief Print the stick and trigger values of a conditioned sample.
+    void PrintAxes(const SGamepadState &strConditionedState)
     {
-        using xbox_controller_api::ApplyRescaledDeadzone;
-
         std::cout << std::fixed << std::setprecision(2) << "  LS("
-                  << ApplyRescaledDeadzone(strState.dLeftStickX_, dDisplayDeadzone) << ", "
-                  << ApplyRescaledDeadzone(strState.dLeftStickY_, dDisplayDeadzone) << ")  RS("
-                  << ApplyRescaledDeadzone(strState.dRightStickX_, dDisplayDeadzone) << ", "
-                  << ApplyRescaledDeadzone(strState.dRightStickY_, dDisplayDeadzone)
-                  << ")  LT=" << strState.dLeftTrigger_ << "  RT=" << strState.dRightTrigger_ << "\n";
+                  << strConditionedState.dLeftStickX_ << ", " << strConditionedState.dLeftStickY_
+                  << ")  RS(" << strConditionedState.dRightStickX_ << ", "
+                  << strConditionedState.dRightStickY_
+                  << ")  LT=" << strConditionedState.dLeftTrigger_
+                  << "  RT=" << strConditionedState.dRightTrigger_ << "\n";
     }
 } // namespace
 
@@ -199,7 +172,9 @@ int main(int argc, char **argv)
             break;
         }
 
-        const SGamepadState &strState_ = objSource_.state();
+        // Condition the whole snapshot once per poll. Everything downstream then
+        // reads shaped values, rather than each read re-running the deadzone.
+        const SGamepadState strState_ = ApplyStickDeadzone(objSource_.state(), dDisplayDeadzone);
 
         PrintButtonEdges(strPreviousState_, strState_);
 
