@@ -181,6 +181,19 @@ The workflow watches the project source and overlay paths and runs for
 existing manifests when an older derived project lacks the full metadata
 marker; when synchronization is supported, manifest drift is a hard failure.
 
+### Controller-independent launch coverage
+
+The spinup package tests the no-controller lifecycle contract separately from
+the active-controller contract. For active coverage, it preloads a
+BUILD_TESTING-only, package-local SDL fixture into its launch child process.
+When the private test sentinel is set, the fixture attaches one deterministic
+virtual GameController before the unchanged SDL-backed node opens a device. It
+exercises standalone and composed launches at the root and under
+`integration`, including published `Joy` values.
+
+This fixture is CI test infrastructure, not a supported controller simulator:
+it is neither exported nor installed when `BUILD_TESTING=OFF`, and no runtime
+parameter enables it.
 
 ## Python boundary
 

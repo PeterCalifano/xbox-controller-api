@@ -1,7 +1,7 @@
-"""Prove an unchanged standalone launch activates through the SDL test fixture.
+"""Prove every shipped launch form activates through the SDL test fixture.
 
 The fixture is package-local and injected only into the launch child process.
-This test exercises the production SDL source, lifecycle node, and launch file
+This test exercises the production SDL source, lifecycle node, and launch files
 without introducing a runtime simulation parameter.
 """
 
@@ -15,10 +15,12 @@ from ament_index_python.packages import (
     get_package_share_directory,
 )
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, SetEnvironmentVariable
+from launch.actions import GroupAction, IncludeLaunchDescription, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 import launch_testing
 from launch_testing.actions import ReadyToTest
+from launch.events.process import ProcessStarted
+from launch_ros.actions import PushRosNamespace
 from lifecycle_msgs.msg import State
 from lifecycle_msgs.srv import GetState
 import pytest
@@ -35,6 +37,13 @@ REQUIRED_STABLE_STATE_SAMPLES = 3
 
 VIRTUAL_CONTROLLER_SENTINEL = "XBOX_CONTROLLER_API_TEST_VIRTUAL_CONTROLLER"
 VIRTUAL_CONTROLLER_LIBRARY = "libxbox_controller_api_ros_virtual_sdl_controller.so"
+
+# The fixture is seeded with fully deflected sticks and released triggers.
+EXPECTED_STICK_AXES = (1.0, 1.0, -1.0, -1.0)
+EXPECTED_TRIGGER_AXES = (0.0, 0.0)
+
+# This follows xbox_controller_api::AllGamepadButtons(): A and D-pad-left press.
+EXPECTED_BUTTONS = (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
 
 
 def _virtual_controller_library_path() -> Path:
@@ -67,27 +76,56 @@ def _preload_value(objLibraryPath_: Path) -> str:
 
 
 @pytest.mark.launch_test
-def generate_test_description() -> LaunchDescription:
-    """Launch the unmodified standalone asset with the virtual SDL fixture."""
+@launch_testing.parametrize(
+    "charLaunchFile_, charNamespace_",
+    [
+        ("xbox_controller_api.launch.py", ""),
+        ("xbox_controller_api_composition.launch.py", ""),
+        ("xbox_controller_api.launch.py", "integration"),
+        ("xbox_controller_api_composition.launch.py", "integration"),
+    ],
+)
+def generate_test_description(
+    charLaunchFile_: str,
+    charNamespace_: str,
+) -> tuple[LaunchDescription, dict[str, str]]:
+    """Launch one unmodified asset with the virtual SDL fixture enabled."""
     objLibraryPath_ = _virtual_controller_library_path()
     charPackageShare_ = get_package_share_directory("xbox_controller_api_spinup")
     objLaunchSource_ = PythonLaunchDescriptionSource(
-        f"{charPackageShare_}/launch/xbox_controller_api.launch.py"
+        f"{charPackageShare_}/launch/{charLaunchFile_}"
+    )
+    objIncludeLaunch_ = IncludeLaunchDescription(objLaunchSource_)
+    if charNamespace_:
+        objLaunchAction_ = GroupAction(
+            [PushRosNamespace(charNamespace_), objIncludeLaunch_]
+        )
+    else:
+        objLaunchAction_ = objIncludeLaunch_
+
+    # Match each shipped launch form so process liveness remains observable.
+    charProcessName_ = (
+        "component_container"
+        if charLaunchFile_ == "xbox_controller_api_composition.launch.py"
+        else "xbox_controller_api_node"
     )
 
-    return LaunchDescription(
-        [
-            SetEnvironmentVariable(
-                name=VIRTUAL_CONTROLLER_SENTINEL,
-                value="1",
-            ),
-            SetEnvironmentVariable(
-                name="LD_PRELOAD",
-                value=_preload_value(objLibraryPath_),
-            ),
-            IncludeLaunchDescription(objLaunchSource_),
-            ReadyToTest(),
-        ]
+    return (
+        LaunchDescription(
+            [
+                SetEnvironmentVariable(
+                    name=VIRTUAL_CONTROLLER_SENTINEL,
+                    value="1",
+                ),
+                SetEnvironmentVariable(
+                    name="LD_PRELOAD",
+                    value=_preload_value(objLibraryPath_),
+                ),
+                objLaunchAction_,
+                ReadyToTest(),
+            ]
+        ),
+        {"charProcessName_": charProcessName_},
     )
 
 
@@ -108,16 +146,21 @@ class TestVirtualControllerLaunch(unittest.TestCase):
         cls.objNode_.destroy_node()
         rclpy.shutdown()
 
-    def _waitForActiveState(self) -> None:
-        """Require the standalone lifecycle node to stabilize in the active state."""
+    def _waitForActiveState(self, charNodePath_: str, charCase_: str) -> None:
+        """Require the lifecycle node to stabilize in the active state.
+
+        Args:
+            charNodePath_: Fully-qualified path of the lifecycle node.
+            charCase_: Human-readable parametrized launch case.
+        """
         objStateClient_ = self.objNode_.create_client(
             GetState,
-            "/xbox_controller/get_state",
+            f"{charNodePath_}/get_state",
         )
         try:
             self.assertTrue(
                 objStateClient_.wait_for_service(timeout_sec=SERVICE_TIMEOUT_SEC),
-                "Standalone GetState service was unavailable",
+                f"GetState service was unavailable for {charCase_}",
             )
 
             dDeadline_ = time.monotonic() + STATE_TIMEOUT_SEC
@@ -145,39 +188,77 @@ class TestVirtualControllerLaunch(unittest.TestCase):
 
                 time.sleep(STATE_SAMPLE_PERIOD_SEC)
 
-            self.fail(f"Standalone node did not stabilize in active state; got {uiLastState_}")
+            self.fail(
+                f"Lifecycle node did not stabilize in active state for {charCase_}; "
+                f"got {uiLastState_}"
+            )
         finally:
             self.objNode_.destroy_client(objStateClient_)
 
-    def _waitForJoyMessage(self, listJoyMessages_: list[Joy]) -> Joy:
+    def _waitForJoyMessage(self, listJoyMessages_: list[Joy], charCase_: str) -> Joy:
         """Return one Joy message published after the lifecycle node activates."""
         dDeadline_ = time.monotonic() + JOY_TIMEOUT_SEC
         while not listJoyMessages_ and time.monotonic() < dDeadline_:
             rclpy.spin_once(self.objNode_, timeout_sec=STATE_SAMPLE_PERIOD_SEC)
 
-        self.assertTrue(listJoyMessages_, "No Joy message arrived from the active standalone node")
+        self.assertTrue(listJoyMessages_, f"No Joy message arrived for {charCase_}")
 
         return listJoyMessages_[-1]
 
-    def testStandaloneLaunchActivatesAndPublishesJoy(self) -> None:
-        """Require the unchanged standalone launch to publish through SDL."""
+    def _assertJoyContract(self, objJoy_: Joy, charCase_: str) -> None:
+        """Verify the full deterministic virtual-controller Joy contract."""
+        self.assertEqual(len(objJoy_.axes), 6, charCase_)
+        self.assertEqual(len(objJoy_.buttons), 15, charCase_)
+        self.assertEqual(tuple(objJoy_.axes[:4]), EXPECTED_STICK_AXES, charCase_)
+        self.assertEqual(tuple(objJoy_.axes[4:]), EXPECTED_TRIGGER_AXES, charCase_)
+        self.assertEqual(tuple(objJoy_.buttons), EXPECTED_BUTTONS, charCase_)
+        self.assertEqual(objJoy_.header.frame_id, "xbox_controller", charCase_)
+        self.assertTrue(
+            objJoy_.header.stamp.sec > 0 or objJoy_.header.stamp.nanosec > 0,
+            f"Joy stamp was not populated for {charCase_}",
+        )
+
+    def _assertProcessIsAlive(
+        self,
+        proc_info: launch_testing.ActiveProcInfoHandler,
+        charProcessName_: str,
+        charCase_: str,
+    ) -> None:
+        """Require the standalone node or composition container to remain alive."""
+        self.assertIsInstance(
+            proc_info[charProcessName_],
+            ProcessStarted,
+            f"Process exited before active-state verification for {charCase_}",
+        )
+
+    def testLaunchPathActivatesAndPublishesJoy(
+        self,
+        charLaunchFile_: str,
+        charNamespace_: str,
+        charProcessName_: str,
+        proc_info: launch_testing.ActiveProcInfoHandler,
+    ) -> None:
+        """Require each unchanged launch path to publish the seeded SDL state."""
+        charNamespacePrefix_ = f"/{charNamespace_}" if charNamespace_ else ""
+        charNodePath_ = f"{charNamespacePrefix_}/xbox_controller"
+        charCase_ = f"launch={charLaunchFile_}, namespace={charNamespace_ or '<root>'}"
+
         listJoyMessages_: list[Joy] = []
         objJoySubscription_ = self.objNode_.create_subscription(
             Joy,
-            "/xbox_controller/joy",
+            f"{charNodePath_}/joy",
             listJoyMessages_.append,
             10,
         )
         try:
-            self._waitForActiveState()
-            objJoy_ = self._waitForJoyMessage(listJoyMessages_)
-
-            self.assertEqual(len(objJoy_.axes), 6)
-            self.assertEqual(len(objJoy_.buttons), 15)
-            self.assertEqual(objJoy_.header.frame_id, "xbox_controller")
-            self.assertTrue(
-                objJoy_.header.stamp.sec > 0 or objJoy_.header.stamp.nanosec > 0,
-                "Virtual-controller Joy stamp was not populated",
+            proc_info.assertWaitForStartup(
+                process=charProcessName_,
+                timeout=SERVICE_TIMEOUT_SEC,
             )
+            self._waitForActiveState(charNodePath_, charCase_)
+            self._assertProcessIsAlive(proc_info, charProcessName_, charCase_)
+            objJoy_ = self._waitForJoyMessage(listJoyMessages_, charCase_)
+            self._assertJoyContract(objJoy_, charCase_)
+            self._assertProcessIsAlive(proc_info, charProcessName_, charCase_)
         finally:
             self.objNode_.destroy_subscription(objJoySubscription_)
