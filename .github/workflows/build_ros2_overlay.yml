@@ -82,4 +82,6 @@ jobs:
       - name: Build and test ROS 2 overlay
         id: build_overlay
         shell: bash
+        env:
+          XBOX_CONTROLLER_API_TEST_EXPECTED_STATE: inactive
         run: ./build_ros2.sh --clean --no-version-sync

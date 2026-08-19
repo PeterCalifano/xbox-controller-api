@@ -7,8 +7,9 @@
 
 #include <gtest/gtest.h>
 #include <rclcpp/rclcpp.hpp>
-#include <xbox_controller_api/CSdlGamepadSource.h>
 
+#include <cstdint>
+#include <limits>
 #include <memory>
 
 namespace {
@@ -19,9 +20,11 @@ void EnsureRosInitialized() {
   }
 }
 
-rclcpp::NodeOptions MakeOptions(double dPublishRateHz) {
+rclcpp::NodeOptions MakeOptions(
+    double dPublishRateHz,
+    std::int32_t i32JoystickIndex = -1) {
   rclcpp::NodeOptions objOptions_;
-  objOptions_.append_parameter_override("joystick_index", -1);
+  objOptions_.append_parameter_override("joystick_index", i32JoystickIndex);
   objOptions_.append_parameter_override("publish_rate_hz", dPublishRateHz);
   objOptions_.append_parameter_override("stick_deadzone", 0.15);
   objOptions_.append_parameter_override("frame_id", std::string("test_pad"));
@@ -52,25 +55,18 @@ TEST(XboxControllerLifecycleNode, AnUnusablePublishRateFailsConfiguration) {
   EXPECT_EQ(objNode_->configure().label(), "unconfigured");
 }
 
-TEST(XboxControllerLifecycleNode, ActivationOutcomeMatchesBackendAvailability) {
+TEST(XboxControllerLifecycleNode, ActivationWithImpossibleIndexStaysInactive) {
   EnsureRosInitialized();
 
+  // A valid SDL backend cannot expose a controller at INT32_MAX, so this
+  // exercises the real open failure path independently of host hardware.
   auto objNode_ = std::make_shared<xbox_controller_api_ros::CXboxControllerLifecycleNode>(
-      MakeOptions(50.0));
+      MakeOptions(50.0, std::numeric_limits<std::int32_t>::max()));
   ASSERT_EQ(objNode_->configure().label(), "inactive");
 
-  // The test accepts either hardware outcome.
+  // Failed activation remains configured and never depends on a physical pad.
   const std::string charStateAfterActivate_ = objNode_->activate().label();
-
-  if (!xbox_controller_api::CSdlGamepadSource::isBackendAvailable()) {
-    EXPECT_EQ(charStateAfterActivate_, "inactive");
-  }
-
-  EXPECT_TRUE(charStateAfterActivate_ == "active" || charStateAfterActivate_ == "inactive");
-
-  if (charStateAfterActivate_ == "active") {
-    EXPECT_EQ(objNode_->deactivate().label(), "inactive");
-  }
+  EXPECT_EQ(charStateAfterActivate_, "inactive");
 
   EXPECT_EQ(objNode_->cleanup().label(), "unconfigured");
 }
