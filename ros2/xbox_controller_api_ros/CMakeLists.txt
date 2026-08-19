@@ -64,6 +64,25 @@ ament_target_dependencies(xbox_controller_api_node
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(SDL2 CONFIG REQUIRED)
+
+  # Interpose SDL only in launch-test child processes. This private fixture is
+  # deliberately absent from the exported ROS package API and release installs.
+  add_library(xbox_controller_api_ros_virtual_sdl_controller SHARED
+    test/virtual_sdl_gamecontroller.cpp
+  )
+  target_compile_features(xbox_controller_api_ros_virtual_sdl_controller PRIVATE cxx_std_20)
+  target_link_libraries(xbox_controller_api_ros_virtual_sdl_controller
+    PRIVATE
+      SDL2::SDL2
+      ${CMAKE_DL_LIBS}
+  )
+
+  # Keep the preload target package-local so launch tests resolve it through
+  # the ament prefix without making it a production runtime dependency.
+  install(TARGETS xbox_controller_api_ros_virtual_sdl_controller
+    LIBRARY DESTINATION lib/${PROJECT_NAME}
+  )
 
   ament_add_gtest(test_joy_conversion test/test_joy_conversion.cpp)
   if(TARGET test_joy_conversion)

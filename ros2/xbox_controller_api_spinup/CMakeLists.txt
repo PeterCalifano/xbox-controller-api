@@ -16,6 +16,11 @@ if(BUILD_TESTING)
     test/test_spinup_launch.py
     TIMEOUT 30
   )
+
+  add_launch_test(
+    test/test_virtual_controller_launch.py
+    TIMEOUT 30
+  )
 endif()
 
 ament_package()
