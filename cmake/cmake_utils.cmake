@@ -262,7 +262,7 @@ function(add_tests project_lib_name excluded_list tests_list_var target_compile_
                 NAME ${testName}
                 COMMAND
                     ${CMAKE_COMMAND} -E env
-                    "PYTHONPATH=${PROJECT_SOURCE_DIR}/python:${PROJECT_BINARY_DIR}/python:$ENV{PYTHONPATH}"
+                    "PYTHONPATH=${PROJECT_BINARY_DIR}/python:${PROJECT_SOURCE_DIR}/python:$ENV{PYTHONPATH}"
                     "LD_LIBRARY_PATH=${PROJECT_BINARY_DIR}/src:$ENV{LD_LIBRARY_PATH}"
                     ${pythonTestCommand} -m pytest -q "${testPath}")
 

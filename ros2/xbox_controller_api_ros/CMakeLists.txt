@@ -2,11 +2,6 @@ cmake_minimum_required(VERSION 3.16)
 
 project(xbox_controller_api_ros)
 
-get_filename_component(XBOX_CONTROLLER_API_REPOSITORY_ROOT
-  "${CMAKE_CURRENT_LIST_DIR}/../.."
-  ABSOLUTE
-)
-
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
 endif()
@@ -16,27 +11,24 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(xbox_controller_api REQUIRED)
-find_package(xbox_controller_api_interfaces REQUIRED)
 
-add_library(xbox_controller_api_ros_conversions SHARED
-  src/conversions.cpp
+# Snapshot to Joy conversion, kept free of rclcpp so it stays unit testable
+# without a ROS context or a controller.
+add_library(xbox_controller_api_ros_joy_conversion SHARED
+  src/joy_conversion.cpp
 )
-target_include_directories(xbox_controller_api_ros_conversions
+target_include_directories(xbox_controller_api_ros_joy_conversion
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
-  PRIVATE
-    # Keep this source path only for additive rollout compatibility with older
-    # derived cores whose adapted seam uses a non-installed header. The exported
-    # core target remains the primary template consumption interface.
-    ${XBOX_CONTROLLER_API_REPOSITORY_ROOT}/src
 )
-target_link_libraries(xbox_controller_api_ros_conversions
+target_link_libraries(xbox_controller_api_ros_joy_conversion
   xbox_controller_api::xbox_controller_api
 )
-ament_target_dependencies(xbox_controller_api_ros_conversions
-  xbox_controller_api_interfaces
+ament_target_dependencies(xbox_controller_api_ros_joy_conversion
+  sensor_msgs
 )
 
 add_library(xbox_controller_api_ros_component SHARED
@@ -48,7 +40,7 @@ target_include_directories(xbox_controller_api_ros_component
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(xbox_controller_api_ros_component
-  xbox_controller_api_ros_conversions
+  xbox_controller_api_ros_joy_conversion
   xbox_controller_api::xbox_controller_api
 )
 ament_target_dependencies(xbox_controller_api_ros_component
@@ -56,7 +48,7 @@ ament_target_dependencies(xbox_controller_api_ros_component
   rclcpp_components
   rclcpp_lifecycle
   lifecycle_msgs
-  xbox_controller_api_interfaces
+  sensor_msgs
 )
 rclcpp_components_register_nodes(xbox_controller_api_ros_component
   "xbox_controller_api_ros::CXboxControllerLifecycleNode"
@@ -72,11 +64,30 @@ ament_target_dependencies(xbox_controller_api_node
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(SDL2 CONFIG REQUIRED)
 
-  ament_add_gtest(test_conversions test/test_conversions.cpp)
-  if(TARGET test_conversions)
-    target_link_libraries(test_conversions
-      xbox_controller_api_ros_conversions
+  # Interpose SDL only in launch-test child processes. This private fixture is
+  # deliberately absent from the exported ROS package API and release installs.
+  add_library(xbox_controller_api_ros_virtual_sdl_controller SHARED
+    test/virtual_sdl_gamecontroller.cpp
+  )
+  target_compile_features(xbox_controller_api_ros_virtual_sdl_controller PRIVATE cxx_std_20)
+  target_link_libraries(xbox_controller_api_ros_virtual_sdl_controller
+    PRIVATE
+      SDL2::SDL2
+      ${CMAKE_DL_LIBS}
+  )
+
+  # Keep the preload target package-local so launch tests resolve it through
+  # the ament prefix without making it a production runtime dependency.
+  install(TARGETS xbox_controller_api_ros_virtual_sdl_controller
+    LIBRARY DESTINATION lib/${PROJECT_NAME}
+  )
+
+  ament_add_gtest(test_joy_conversion test/test_joy_conversion.cpp)
+  if(TARGET test_joy_conversion)
+    target_link_libraries(test_joy_conversion
+      xbox_controller_api_ros_joy_conversion
     )
   endif()
 
@@ -94,7 +105,7 @@ install(DIRECTORY include/
 
 install(
   TARGETS
-    xbox_controller_api_ros_conversions
+    xbox_controller_api_ros_joy_conversion
     xbox_controller_api_ros_component
     xbox_controller_api_node
   EXPORT ${PROJECT_NAME}Targets
@@ -110,7 +121,7 @@ ament_export_dependencies(
   rclcpp_components
   rclcpp_lifecycle
   lifecycle_msgs
+  sensor_msgs
   xbox_controller_api
-  xbox_controller_api_interfaces
 )
 ament_package()

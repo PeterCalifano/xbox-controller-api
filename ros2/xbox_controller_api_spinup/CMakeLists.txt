@@ -14,7 +14,12 @@ if(BUILD_TESTING)
 
   add_launch_test(
     test/test_spinup_launch.py
-    TIMEOUT 45
+    TIMEOUT 30
+  )
+
+  add_launch_test(
+    test/test_virtual_controller_launch.py
+    TIMEOUT 30
   )
 endif()
 

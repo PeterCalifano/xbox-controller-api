@@ -64,7 +64,7 @@ jobs:
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.runner == 'github-hosted' }}
         run: |
           sudo apt update
-          sudo apt install -y cmake ninja-build g++ ccache libboost-all-dev libeigen3-dev libtbb-dev python3-dev python3-pytest
+          sudo apt install -y cmake ninja-build g++ ccache libboost-all-dev libeigen3-dev libsdl2-dev libtbb-dev python3-dev python3-pytest
 
       - name: Validate self-hosted prerequisites
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'self-hosted' }}
@@ -92,6 +92,8 @@ jobs:
             -DENABLE_TESTS=ON \
             -DENABLE_TBB="${ENABLE_TBB}" \
             -DENABLE_OPENGL=OFF \
+            -DENABLE_SDL2=ON \
+            -DENABLE_SDL2_STRICT=ON \
             -DCPU_ENABLE_NATIVE_TUNING=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -126,7 +128,7 @@ jobs:
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.runner == 'github-hosted' }}
         run: |
           sudo apt update
-          sudo apt install -y cmake ninja-build g++ libboost-all-dev libeigen3-dev libtbb-dev python3-dev python3-pytest
+          sudo apt install -y cmake ninja-build g++ libboost-all-dev libeigen3-dev libsdl2-dev libtbb-dev python3-dev python3-pytest
 
       - name: Validate self-hosted prerequisites
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'self-hosted' }}
@@ -153,6 +155,18 @@ jobs:
             find "${BUILD_DIR}" -maxdepth 3 -type d | sort || true
             exit 1
           fi
+
+      - name: Validate downloaded runtime dependencies
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'self-hosted' }}
+        run: |
+          library_path="${CTEST_DIR}/src/libxbox_controller_api.so"
+          test -f "${library_path}"
+          dependency_report="$(ldd "${library_path}")"
+          printf '%s\n' "${dependency_report}"
+          if grep -q "not found" <<< "${dependency_report}"; then
+            exit 1
+          fi
+          grep -q "libSDL2" <<< "${dependency_report}"
 
       - name: Restore test executable permissions
         run: |

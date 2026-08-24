@@ -1,8 +1,10 @@
 # ROS 2 Overlay
 
-The optional ROS 2 overlay is a colcon workspace layered on top of the C++-first template. The normal library entry point is still `./build_lib.sh`; it never needs ROS and never reads `ros2/`.
+The optional ROS 2 overlay is a colcon workspace layered on top of the
+C++-first library. The normal library entry point is still `./build_lib.sh`; it
+does not need ROS and does not read `ros2/`.
 
-## Encapsulation contract
+## Scope
 
 ROS integration lives in `ros2/` plus the root overlay helpers:
 
@@ -27,17 +29,19 @@ The overlay packages are:
 | Package | Role |
 |---|---|
 | `xbox_controller_api` | Plain CMake shim around the core library. |
-| `xbox_controller_api_interfaces` | ROS messages and services. |
-| `xbox_controller_api_ros` | Bridge package with conversions, lifecycle node, component, executable, and tests. |
+| `xbox_controller_api_ros` | Bridge package with the Joy conversion, lifecycle node, component, executable, and tests. |
 | `xbox_controller_api_spinup` | Launch files and default node configuration. |
 
-The `xbox_controller_api_ros` package keeps a conversions-vs-node split. `xbox_controller_api_ros_conversions` links the core library and interfaces but does not depend on `rclcpp`; it is safe to test without a ROS executor. `xbox_controller_api_ros_component` owns lifecycle, parameters, publishers, services, and component registration.
+There is no interfaces package: the overlay publishes the standard `sensor_msgs/msg/Joy` and defines no messages of its own.
+
+The `xbox_controller_api_ros` package keeps a conversion-vs-node split. `xbox_controller_api_ros_joy_conversion` links the core library and `sensor_msgs` but does not depend on `rclcpp`; it is safe to test without a ROS executor. `xbox_controller_api_ros_component` owns lifecycle, parameters, the publisher, the poll timer, and component registration.
 
 Core C++ unit tests remain Catch2-based. ROS package tests use
 `ament_cmake_gtest` as the narrow ROS-specific exception so ament registers and
 reports them through colcon.
 
-The bridge is intentionally source-adjacent: its private include path can reach core headers under the repository `src/` tree without making those headers part of the installed public API. A derived project should adapt `conversions.cpp` to use an exported public core header whenever one exists. An installed-only bridge consumer requires the core project to install/export that header first; the overlay does not turn private source headers into a public SDK.
+The bridge uses installed public core headers. A core header needed by a ROS
+translation unit must therefore be installed and exported by the library.
 
 ## Build usage
 
@@ -53,19 +57,24 @@ Source a ROS 2 environment, or let `build_ros2.sh` source `/opt/ros/${ROS_DISTRO
 
 The script defaults `ROS_DISTRO` to `jazzy`, but it is otherwise distro-agnostic when the requested distro is installed.
 
-The supplied standalone and composition launch files autostart the lifecycle node through `launch_ros`: they request configure, wait for the inactive state, then request activate. The service is therefore ready when either launch path finishes starting. Each launch file retains the equivalent plain `Node` or `ComposableNode` description as a commented template alternative. Uncomment that form only when an external lifecycle manager owns transitions; launching the raw executable, loading the raw component, or using those alternatives intentionally leaves the node unconfigured.
+The standalone and composition launch files configure and activate the lifecycle
+node through `launch_ros`. Both retain a commented plain-node alternative for
+use with an external lifecycle manager; that alternative does not autostart the
+node.
 
 Jazzy's current `ComposableLifecycleNode` implementation resolves the loaded component's fully qualified name inconsistently during autostart. The composition launch file supplies that identity to the lifecycle event manager locally; remove the compatibility adapter after the upstream `launch_ros` fix is available in the supported ROS distro.
 
 ## COLCON_IGNORE policy
 
-`COLCON_IGNORE` markers keep colcon from crawling template support trees that are not ROS packages:
+`COLCON_IGNORE` markers keep colcon from crawling directories that are not ROS
+packages:
 
 - `python/COLCON_IGNORE`: required because generated `setup.py` files can be misdetected as Python packages.
 - `lib/COLCON_IGNORE`: protects vendored submodules if they contain manifests.
 - `examples/COLCON_IGNORE` and `tests/COLCON_IGNORE`: avoid accidental package discovery in starter project code.
 
-There are no markers in `doc/`. Runtime-generated top-level directories such as `build*`, `install`, and `xbox_controller_api_subbuild` are handled best-effort by `build_ros2.sh` when they exist. This matters when the repository is placed inside a parent workspace: without the markers, a parent colcon crawl can discover unrelated template internals.
+There are no markers in `doc/`. When present, `build*`, `install`, and
+`xbox_controller_api_subbuild` are handled by `build_ros2.sh`.
 
 ## Project metadata sync
 
@@ -115,19 +124,37 @@ Run `./generate_version.sh` manually after changing root project metadata or tag
 before packaging source archives. Releases need the tag-safe preparation order
 described in [Release tagging with the ROS 2 overlay](versioning.md#release-tagging-with-the-ros-2-overlay).
 
-## Adaptation seam
+## Joy bridge
 
-The primary adaptation seam is:
+The overlay publishes an attached controller as the standard
+`sensor_msgs/msg/Joy` on `~/joy`, which is what lets `teleop_twist_joy`,
+`joy_teleop`, rqt tooling and rosbag consume it without any glue.
+
+Two files carry the adaptation:
 
 ```text
-ros2/xbox_controller_api_ros/src/conversions.cpp
+ros2/xbox_controller_api_ros/src/joy_conversion.cpp
+ros2/xbox_controller_api_ros/src/CXboxControllerLifecycleNode.cpp
 ```
 
-Update the fenced include and the `EvaluateTemplateCore` body to call the real
-library API. It currently calls the placeholder so the overlay keeps building.
-Review `ros2/xbox_controller_api_ros/src/CXboxControllerLifecycleNode.cpp` only
-when ROS node wiring, parameters, publishers, or services also need to change.
-Then run `./build_ros2.sh --clean`.
+`joy_conversion.cpp` turns an `SGamepadState` into a `Joy` message without
+depending on rclcpp, so it can be tested without a ROS context or controller.
+It leaves the stamp unset because snapshot timestamps use a steady clock; the
+node supplies ROS time before publication.
+
+`CXboxControllerLifecycleNode.cpp` owns the device and poll timer. Configuration
+creates the publisher without accessing hardware, activation opens the device,
+and deactivation closes it. A detach stops publication; deactivate and activate
+the node to reconnect.
+
+The overlay uses installed public headers. Any core header needed by a ROS
+translation unit must be installed, not merely present under `src/`. The overlay
+forces `ENABLE_SDL2=ON` and `ENABLE_SDL2_STRICT=ON`, making `libsdl2-dev` a
+build requirement.
+
+After changing any of this, run `./build_ros2.sh --clean`. A plain incremental
+build reuses a cached source list, because the core's source globs do not use
+`CONFIGURE_DEPENDS`.
 
 ## Removal
 
@@ -154,6 +181,19 @@ The workflow watches the project source and overlay paths and runs for
 existing manifests when an older derived project lacks the full metadata
 marker; when synchronization is supported, manifest drift is a hard failure.
 
+### Controller-independent launch coverage
+
+The spinup package tests the no-controller lifecycle contract separately from
+the active-controller contract. For active coverage, it preloads a
+BUILD_TESTING-only, package-local SDL fixture into its launch child process.
+When the private test sentinel is set, the fixture attaches one deterministic
+virtual GameController before the unchanged SDL-backed node opens a device. It
+exercises standalone and composed launches at the root and under
+`integration`, including published `Joy` values.
+
+This fixture is CI test infrastructure, not a supported controller simulator:
+it is neither exported nor installed when `BUILD_TESTING=OFF`, and no runtime
+parameter enables it.
 
 ## Python boundary
 

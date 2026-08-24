@@ -9,6 +9,11 @@ get_filename_component(XBOX_CONTROLLER_API_REPOSITORY_ROOT
 
 set(ENABLE_TESTS OFF CACHE BOOL "Disable core template tests in the ROS 2 overlay build." FORCE)
 set(ENABLE_FETCH_CATCH2 OFF CACHE BOOL "Do not fetch Catch2 while building the ROS 2 overlay." FORCE)
+# The overlay publishes real controller data, so the backend is required rather
+# than optional here. Strict mode makes a missing libsdl2-dev a configure error
+# instead of silently producing a node that can never open a device.
+set(ENABLE_SDL2 ON CACHE BOOL "Build the SDL2 gamepad backend for the ROS 2 overlay." FORCE)
+set(ENABLE_SDL2_STRICT ON CACHE BOOL "Fail the overlay build when SDL2 is unavailable." FORCE)
 
 # The root CMakeLists appends PROJECT_SOURCE_DIR/cmake before its project()
 # call, which points at this shim during nested configure. Keep the real helper

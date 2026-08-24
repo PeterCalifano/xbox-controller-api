@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Synchronize ROS 2 package manifests from the root CMake project metadata.
-
-Example:
-    python3 ros2/tools/sync_package_metadata.py \
-        --project-root . --ros2-dir ros2 --version 1.2.3
-    # Output:
-    # Synchronized 4 ROS 2 package manifests.
-"""
+"""Synchronize immediate ROS 2 package manifests with root CMake metadata."""
 
 from __future__ import annotations
 
@@ -30,14 +23,7 @@ _STRICT_VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 
 @dataclass(frozen=True)
 class ProjectMetadata:
-    """Project-owned values exported by the metadata-only CMake configure.
-
-    Example:
-        metadata_ = ProjectMetadata("demo", "1.2.3", "Demo", "https://example.test", "A", "a@example.test", "MIT")
-        print(metadata_.version)
-        # Output:
-        # 1.2.3
-    """
+    """Metadata read from the root CMake project."""
 
     project_name: str
     version: str
@@ -49,13 +35,7 @@ class ProjectMetadata:
 
 
 class PackageRole(Enum):
-    """Role-specific description suffixes for overlay package manifests.
-
-    Example:
-        print(PackageRole.BRIDGE.value)
-        # Output:
-        # ROS 2 bridge package.
-    """
+    """Description suffixes used for overlay package roles."""
 
     SHIM = "ROS 2 colcon shim package."
     INTERFACES = "ROS 2 message and service interfaces."
@@ -66,13 +46,7 @@ class PackageRole(Enum):
 
 @dataclass(frozen=True)
 class ManifestDocument:
-    """Parsed package manifest plus filesystem and outer-XML state.
-
-    Example:
-        print(ManifestDocument.__name__)
-        # Output:
-        # ManifestDocument
-    """
+    """Parsed package manifest and its original filesystem state."""
 
     path: Path
     mode: int
@@ -85,14 +59,7 @@ class ManifestDocument:
 
 @dataclass(frozen=True)
 class ManifestUpdate:
-    """Prepared atomic replacement for one package manifest.
-
-    Example:
-        update_ = ManifestUpdate(Path("package.xml"), 0o644, b"old", b"new")
-        print(oct(update_.mode))
-        # Output:
-        # 0o644
-    """
+    """Prepared replacement for one package manifest."""
 
     path: Path
     mode: int
@@ -101,13 +68,7 @@ class ManifestUpdate:
 
 
 def _ReadCacheValue(cacheText_: str, key_: str) -> str:
-    """Read one non-empty field from CMakeCache.txt text.
-
-    Example:
-        print(_ReadCacheValue("FIELD:STRING=value\n", "FIELD"))
-        # Output:
-        # value
-    """
+    """Return a non-empty CMake cache field."""
     prefix_ = f"{key_}:"
     for line_ in cacheText_.splitlines():
         if not line_.startswith(prefix_):
@@ -120,12 +81,7 @@ def _ReadCacheValue(cacheText_: str, key_: str) -> str:
 
 
 def _ConfigureProjectMetadata(projectRoot_: Path, version_: str) -> ProjectMetadata:
-    """Run the root metadata-only CMake configure and read its cache.
-
-    Example:
-        # _ConfigureProjectMetadata(Path("."), "1.2.3")
-        # Output: ProjectMetadata populated from CMakeCache.txt
-    """
+    """Configure the root project in metadata-only mode and read its cache."""
     cmakeExecutable_ = shutil.which("cmake")
     if cmakeExecutable_ is None:
         raise RuntimeError("cmake was not found on PATH")
@@ -175,12 +131,7 @@ def _ConfigureProjectMetadata(projectRoot_: Path, version_: str) -> ProjectMetad
 
 
 def _ReadOuterXmlNodes(path_: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """Capture comments and processing instructions outside the package root.
-
-    Example:
-        # leading_, trailing_ = _ReadOuterXmlNodes(Path("package.xml"))
-        # Output: (("<?xml-model ...?>",), ())
-    """
+    """Return XML nodes before and after the package root."""
     leadingNodes_: list[str] = []
     trailingNodes_: list[str] = []
     depth_ = 0
@@ -206,12 +157,7 @@ def _ReadOuterXmlNodes(path_: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
 
 
 def _ReadManifest(path_: Path) -> ManifestDocument:
-    """Parse one package manifest while retaining comments, PIs, and file mode.
-
-    Example:
-        # document_ = _ReadManifest(Path("ros2/demo/package.xml"))
-        # Output: ManifestDocument(..., package_name="demo")
-    """
+    """Parse one manifest while preserving outer nodes and file mode."""
     leadingNodes_, trailingNodes_ = _ReadOuterXmlNodes(path_)
     parser_ = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True, insert_pis=True))
     tree_ = ET.parse(path_, parser=parser_)
@@ -234,26 +180,19 @@ def _ReadManifest(path_: Path) -> ManifestDocument:
 
 
 def _PackageRoles(packageNames_: frozenset[str]) -> dict[str, PackageRole]:
-    """Infer overlay roles without consulting or changing the CMake project name.
-
-    Example:
-        roles_ = _PackageRoles(frozenset({"demo", "demo_interfaces", "demo_ros", "demo_spinup"}))
-        print(roles_["demo_ros"].name)
-        # Output:
-        # BRIDGE
-    """
+    """Infer package roles from the overlay package names."""
+    # The shim, bridge, and spinup packages identify an overlay. Interfaces are optional.
     prefixCandidates_ = [
         name_
         for name_ in packageNames_
         if {
-            f"{name_}_interfaces",
             f"{name_}_ros",
             f"{name_}_spinup",
         }.issubset(packageNames_)
     ]
     if len(prefixCandidates_) != 1:
         raise ValueError(
-            "Could not identify one ROS overlay package quartet from package names: "
+            "Could not identify one ROS overlay package set from package names: "
             + ", ".join(sorted(packageNames_))
         )
 
@@ -268,14 +207,7 @@ def _PackageRoles(packageNames_: frozenset[str]) -> dict[str, PackageRole]:
 
 
 def _RequireElement(root_: ET.Element, tag_: str, path_: Path) -> ET.Element:
-    """Return a required direct child element.
-
-    Example:
-        element_ = _RequireElement(ET.fromstring("<package><name>demo</name></package>"), "name", Path("package.xml"))
-        print(element_.text)
-        # Output:
-        # demo
-    """
+    """Return a required direct child element."""
     element_ = root_.find(tag_)
     if element_ is None:
         raise ValueError(f"Missing <{tag_}> in {path_}")
@@ -283,15 +215,7 @@ def _RequireElement(root_: ET.Element, tag_: str, path_: Path) -> ET.Element:
 
 
 def _SetWebsiteUrl(root_: ET.Element, homepageUrl_: str, path_: Path) -> None:
-    """Update website URLs or insert one without touching other URL types.
-
-    Example:
-        root_ = ET.fromstring("<package><license>MIT</license></package>")
-        _SetWebsiteUrl(root_, "https://example.test", Path("package.xml"))
-        print(root_.find("url").text)
-        # Output:
-        # https://example.test
-    """
+    """Update the website URL without changing other URL types."""
     websiteElements_ = [url_ for url_ in root_.findall("url") if url_.get("type") == "website"]
     if websiteElements_:
         for websiteElement_ in websiteElements_:
@@ -309,12 +233,7 @@ def _SetWebsiteUrl(root_: ET.Element, homepageUrl_: str, path_: Path) -> None:
 
 
 def _SerializeManifest(document_: ManifestDocument) -> bytes:
-    """Serialize one manifest with its outer XML nodes restored.
-
-    Example:
-        # serialized_ = _SerializeManifest(document_)
-        # Output: b'<?xml version="1.0"?>\n<?xml-model ...?>\n<package ...>\n'
-    """
+    """Serialize a manifest while restoring its outer XML nodes."""
     rootText_ = ET.tostring(document_.tree.getroot(), encoding="unicode")
     sections_ = [
         '<?xml version="1.0"?>',
@@ -330,12 +249,7 @@ def _BuildUpdate(
     metadata_: ProjectMetadata,
     role_: PackageRole,
 ) -> ManifestUpdate:
-    """Prepare one manifest update without changing package identity or dependencies.
-
-    Example:
-        # update_ = _BuildUpdate(document_, metadata_, PackageRole.SHIM)
-        # Output: ManifestUpdate(...)
-    """
+    """Prepare a metadata update without changing package identity or dependencies."""
     root_ = document_.tree.getroot()
     _RequireElement(root_, "version", document_.path).text = metadata_.version
     descriptionBase_ = metadata_.description.rstrip().removesuffix(".")
@@ -354,12 +268,7 @@ def _BuildUpdate(
 
 
 def _WriteUpdate(update_: ManifestUpdate) -> bool:
-    """Atomically replace a changed manifest while preserving its mode.
-
-    Example:
-        # changed_ = _WriteUpdate(update_)
-        # Output: True
-    """
+    """Atomically replace a changed manifest while preserving its mode."""
     if update_.updated_bytes == update_.original_bytes:
         return False
 
@@ -385,11 +294,19 @@ def _WriteUpdate(update_: ManifestUpdate) -> bool:
 
 
 def SynchronizePackageMetadata(projectRoot_: Path, ros2Directory_: Path, version_: str) -> int:
-    """Synchronize all immediate ROS package manifests from root CMake metadata.
+    """Synchronize immediate ROS package manifests with root CMake metadata.
 
-    Example:
-        # count_ = SynchronizePackageMetadata(Path("."), Path("ros2"), "1.2.3")
-        # Output: 4
+    Args:
+        projectRoot_: Root directory of the CMake project.
+        ros2Directory_: Directory containing immediate ROS package directories.
+        version_: Strict ROS package version to apply.
+
+    Returns:
+        Number of synchronized manifests.
+
+    Raises:
+        ValueError: If package metadata or package names are invalid.
+        RuntimeError: If the metadata-only CMake configure fails.
     """
     metadata_ = _ConfigureProjectMetadata(projectRoot_.resolve(), version_)
     manifestPaths_ = sorted(ros2Directory_.resolve().glob("*/package.xml"))
@@ -411,14 +328,7 @@ def SynchronizePackageMetadata(projectRoot_: Path, ros2Directory_: Path, version
 
 
 def _ParseArguments(arguments_: Sequence[str] | None) -> argparse.Namespace:
-    """Parse command-line arguments for the metadata synchronizer.
-
-    Example:
-        arguments_ = _ParseArguments(["--project-root", ".", "--ros2-dir", "ros2", "--version", "1.2.3"])
-        print(arguments_.version)
-        # Output:
-        # 1.2.3
-    """
+    """Parse command-line arguments for the metadata synchronizer."""
     parser_ = argparse.ArgumentParser(description=__doc__)
     parser_.add_argument("--project-root", required=True, type=Path)
     parser_.add_argument("--ros2-dir", required=True, type=Path)
@@ -429,9 +339,11 @@ def _ParseArguments(arguments_: Sequence[str] | None) -> argparse.Namespace:
 def Main(arguments_: Sequence[str] | None = None) -> int:
     """Run the synchronization command.
 
-    Example:
-        # exitCode_ = Main(["--project-root", ".", "--ros2-dir", "ros2", "--version", "1.2.3"])
-        # Output: Synchronized 4 ROS 2 package manifests.
+    Args:
+        arguments_: Command-line arguments, or None to read sys.argv.
+
+    Returns:
+        Zero on success, or one when synchronization fails.
     """
     parsedArguments_ = _ParseArguments(arguments_)
     try:

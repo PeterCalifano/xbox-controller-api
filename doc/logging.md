@@ -1,24 +1,14 @@
 # Dependency-free logging
 
 The reusable logger lives in `src/utils/logging/`. It is ordinary library
-infrastructure: project tailoring keeps the implementation and this guide so a
-derived project normally configures and uses it rather than replacing it.
+infrastructure and is available to applications that link the core library.
 
 ## Design
 
-`xbox_controller_api::logging::CLogger` combines the useful parts of two existing
-local patterns:
-
-- the component and severity format, ordered threshold, stream routing, and
-  concise stream-based value conversion used by `future-onboard-sw`;
-- the dependency-free ANSI sequences, diagnostic-stream capture, and
-  concurrency requirements exercised by `spectral_raytracer_dev`.
-
-The result deliberately stays small. It has no singleton, registry, formatting
-library, file sink, timestamp policy, or asynchronous queue. Each logger owns a
-component name and references caller-owned streams. A complete line is assembled
-before a process-wide output mutex is acquired, so multiple logger instances can
-write to a shared stream without interleaving partial messages.
+`xbox_controller_api::logging::CLogger` is a small dependency-free logger. Each
+instance owns a component name and references caller-owned streams. It formats a
+complete line before taking the process-wide output mutex, preventing partial
+messages from interleaving on a shared stream.
 
 The stable line contract is:
 
@@ -43,7 +33,7 @@ numeric value from `0` to `6`. Missing or invalid values leave the current level
 unchanged and return `false`.
 
 ```bash
-XBOX_CONTROLLER_API_LOG_LEVEL=debug ./build/src/bin/example_program
+XBOX_CONTROLLER_API_LOG_LEVEL=debug ./build/src/bin/xbox_controller_monitor
 ```
 
 ## C++ usage
@@ -91,5 +81,4 @@ The caller must keep custom streams alive for the logger's lifetime. Logging
 calls may come from multiple threads, but changing or destroying those streams
 concurrently is outside the logger contract.
 
-This logger is introduced as part of the `v1.11.0` release line. It is a local
-utility implementation, not a replacement third-party logging framework.
+This is a local utility, not a replacement for a full logging framework.

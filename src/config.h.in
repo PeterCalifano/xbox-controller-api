@@ -36,3 +36,8 @@ std::string GetVersionString()
 
 #cmakedefine VARIABLE_DEFINED_BY_CMAKE // This is a placeholder for a variable defined by CMake. If it is not define, the #define is not included in the output file from configure_file().
 
+// Defined only when the SDL2 gamepad backend was compiled in. Consumers use it
+// to report available features; library sources use the __SDL2_ENABLED__
+// compile definition carried by the SDL2 interface target instead.
+#cmakedefine XBOX_CONTROLLER_API_HAS_SDL2
+

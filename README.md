@@ -4,13 +4,13 @@ A C++ library for reading Xbox controller input, with optional Python bindings
 and ROS 2 integration. Shared builds are the default; static builds are
 selectable through the standard CMake `BUILD_SHARED_LIBS`.
 
-> **Status:** the build, packaging, wrapper, documentation, and CI machinery is
-> in place, but the controller API itself is not implemented yet. The library
-> currently exposes placeholder types (`placeholder.h`, `CWrapperPlaceholder`)
-> that mark where the real implementation goes.
+> **Status:** the input API is implemented. Reading an xpad-class controller
+> works from C++ and from Python, through an SDL2 backend. Version 1 is input only: rumble and LED control are not
+> implemented. See [`doc/controller_api.md`](doc/controller_api.md).
 
 ## Documentation Map
 
+- [`doc/controller_api.md`](doc/controller_api.md): controller setup on Linux, axis and button conventions, deadzones, disconnect handling, and both examples.
 - [`doc/cpp_build.md`](doc/cpp_build.md): C++ build modes, toolchains, and CPU tuning.
 - [`doc/wrappers.md`](doc/wrappers.md): gtwrap setup, Python package workflow, and wrapper docstrings.
 - [`doc/versioning.md`](doc/versioning.md): git tags, source/build/install `VERSION` files, C++ config macros, Python metadata, and packages.
@@ -19,12 +19,169 @@ selectable through the standard CMake `BUILD_SHARED_LIBS`.
 - [`doc/testing_and_ci.md`](doc/testing_and_ci.md): CTest gates, CI workflow expectations, issue forms, and validation reports.
 - [`doc/ros2_overlay.md`](doc/ros2_overlay.md): optional ROS 2 overlay architecture, build flow, and CI.
 
-## Optional ROS 2 Overlay
+## Use the Library
 
-See [`doc/ros2_overlay.md`](doc/ros2_overlay.md) for the optional ROS 2 overlay architecture, build flow, CI, rollout, and removal policy.
+### Choose an entry point
 
-- `./build_lib.sh`: C++-first library entry point; it never needs ROS.
-- `./build_ros2.sh`: optional ROS 2 overlay build and test entry point.
+| Need | Entry point | Hardware or special dependency |
+|---|---|---|
+| Read an attached controller in a C++ application | `CSdlGamepadSource` | SDL2 and an xpad-class controller |
+| Test or replay controller logic without hardware | `CScriptedGamepadSource`, `GamepadFilters`, and `GamepadControls` | None |
+| Inspect a connected controller from the terminal | `xbox_controller_monitor` | SDL2 and a controller |
+| Run the supplied C++ examples | `example_read_controller`, `example_scripted_replay` | First needs SDL2 and a controller; second needs neither |
+| Link the core into another CMake project | `xbox_controller_api::xbox_controller_api` | Installed package or source checkout |
+| Read a controller from Python | `xbox_controller_api.CGamepadWrapper` | gtwrap, Python 3.12+, SDL2, and a controller |
+| Publish `sensor_msgs/msg/Joy` | ROS 2 lifecycle node and launch files | ROS 2, SDL2, and a controller |
+
+`./build_lib.sh` is the native C++ entry point and never requires ROS.
+`./build_ros2.sh` builds the optional ROS 2 overlay separately.
+
+### Build and run the included native tools
+
+Build the library, examples, programs, and tests:
+
+```bash
+./build_lib.sh
+```
+
+The build-tree executables are:
+
+```bash
+# Live diagnostic: raw normalized values, button edges, and attach status.
+./build/src/bin/xbox_controller_monitor
+
+# Live example: polls at 50 Hz for 20 seconds by default.
+./build/examples/xbox_controller_api_examples/example_read_controller 20
+
+# Hardware-free example: replay a scripted sample sequence.
+./build/examples/xbox_controller_api_examples/example_scripted_replay
+```
+
+`xbox_controller_monitor` is installed to `bin/` when the library is installed.
+The monitor and `example_read_controller` report an unavailable backend or a
+missing controller and exit normally. The replay example uses no SDL2 or
+controller hardware, so it also works after:
+
+```bash
+./build_lib.sh -D ENABLE_SDL2=OFF
+./build/examples/xbox_controller_api_examples/example_scripted_replay
+```
+
+### Read a controller from C++
+
+Use `CSdlGamepadSource` for hardware access. Call `update()` at the cadence
+your application needs; it never sleeps or pumps SDL events.
+
+```cpp
+#include <xbox_controller_api/CSdlGamepadSource.h>
+#include <xbox_controller_api/GamepadControls.h>
+#include <xbox_controller_api/GamepadFilters.h>
+
+#include <iostream>
+
+int main()
+{
+    using namespace xbox_controller_api;
+
+    CSdlGamepadSource objSource;
+    if (!objSource.open())
+    {
+        std::cerr << objSource.lastError() << "\n";
+        return 1;
+    }
+
+    SGamepadState strPreviousState;
+    while (objSource.update())
+    {
+        const SGamepadState strState = ApplyStickDeadzone(objSource.state(), 0.15);
+        if (ClassifyButtonEdge(strPreviousState, strState, EGamepadButton::A) ==
+            EButtonEdge::Pressed)
+        {
+            std::cout << "A pressed\n";
+        }
+        strPreviousState = strState;
+    }
+
+    objSource.close();
+}
+```
+
+Use the other public headers for the surrounding tasks:
+
+| Header | Use |
+|---|---|
+| `SGamepadState.h` | One normalized controller sample |
+| `GamepadFilters.h` | Axis normalization, deadzones, and button-edge classification |
+| `GamepadControls.h` | Iterate buttons, read a generic button, and obtain stable button names |
+| `CScriptedGamepadSource.h` | Queue deterministic frames and disconnects for tests or replay |
+
+The value ranges, Y-axis convention, disconnect behavior, and multi-controller
+selection are specified in [`doc/controller_api.md`](doc/controller_api.md).
+
+### Use the Python wrapper
+
+Build the wrapper, install its generated package into the Python environment
+used for the build, then run the supplied example:
+
+```bash
+python3 -m pip install pyparsing
+./build_lib.sh -p
+cmake --build build --target python-install
+python3 examples/python/example_read_controller.py 20
+```
+
+If gtwrap is not installed as a CMake package, pass a local checkout explicitly:
+
+```bash
+./build_lib.sh -p --gtwrap-root /path/to/wrap
+```
+
+The wrapper exposes `CGamepadWrapper`, which provides `open()`, `update()`,
+axis accessors, named button accessors, and generic button iteration. Check
+`HAS_WRAPPER` before using it when an application must also run without the
+compiled extension. See [`doc/wrappers.md`](doc/wrappers.md) for package and
+runtime-library details.
+
+### Use the ROS 2 overlay
+
+The overlay publishes `sensor_msgs/msg/Joy` on `/xbox_controller/joy` by
+default. Build it in a ROS 2 environment, source the overlay, then choose one
+autostart launch file:
+
+```bash
+./build_ros2.sh --clean
+source ros2/install/setup.bash
+
+# Option 1: standalone lifecycle-node process.
+ros2 launch xbox_controller_api_spinup xbox_controller_api.launch.py
+```
+
+Or run the lifecycle component in a container:
+
+```bash
+ros2 launch xbox_controller_api_spinup xbox_controller_api_composition.launch.py
+```
+
+In a separate terminal, inspect the published messages with:
+
+```bash
+ros2 topic echo /xbox_controller/joy
+```
+
+For a lifecycle manager you control, run the executable directly and request
+the transitions yourself. Parameters must be supplied before configuration:
+
+```bash
+ros2 run xbox_controller_api_ros xbox_controller_api_node --ros-args \
+  -p joystick_index:=0 -p publish_rate_hz:=100.0 -p stick_deadzone:=0.15
+ros2 lifecycle set /xbox_controller configure
+ros2 lifecycle set /xbox_controller activate
+```
+
+After a controller disconnect, deactivate and activate the node to reconnect.
+The full parameter list, `Joy` axis/button order, and composition details are
+in [`doc/controller_api.md`](doc/controller_api.md#ros-2) and
+[`doc/ros2_overlay.md`](doc/ros2_overlay.md).
 
 
 ## Requirements
@@ -34,6 +191,7 @@ See [`doc/ros2_overlay.md`](doc/ros2_overlay.md) for the optional ROS 2 overlay 
 | CMake | ≥ 3.15 | |
 | C++ compiler | C++20 | GCC 11+, Clang 13+ |
 | Eigen3 | ≥ 3.4 | Required |
+| SDL2 | ≥ 2.0.9 | Optional but ON by default; provides the controller backend (`libsdl2-dev`) |
 | oneTBB | any | Optional (`-DENABLE_TBB=ON`) |
 | Catch2 | 3.x | Auto-fetched from GitHub if not found |
 | pytest | any | Required when `ENABLE_PYTHON_TESTS=ON` and `test*.py` files are present |
@@ -156,6 +314,8 @@ ignored with `--rebuild-only`.
 | `xbox_controller_api_METADATA_ONLY` | OFF | Configure project identity/version without compiler languages |
 | `ENABLE_TBB` | OFF | Intel oneTBB support (`find_package(TBB)`) |
 | `ENABLE_OPENGL` | OFF | OpenGL support |
+| `ENABLE_SDL2` | ON | SDL2-backed controller input. When SDL2 is missing the build warns and the backend is stubbed out, keeping the full API surface |
+| `ENABLE_SDL2_STRICT` | OFF | Turn a missing SDL2 into a configure error instead of a warning; used by CI |
 | `ENABLE_TESTS` | ON | Register and run CTest tests |
 | `CATCH2_TEST_REPORTER` | `compact` | Catch2 reporter passed through `catch_discover_tests` |
 | `CATCH2_TEST_PROPERTIES` | `LABELS;catch2` | CTest property name/value pairs for discovered Catch2 tests |
@@ -369,36 +529,48 @@ PROJECT_VERSION_MAJOR    // integer macros
 
 ---
 
-## Installation and Consuming as a Library
+## Install or Consume the C++ Library
 
-Install to the default prefix (`./install`) or a custom one:
+Install the shared library to the default `./install` prefix, a custom prefix,
+or as a static library:
 
 ```bash
 ./build_lib.sh -t release -i
-# or with custom prefix:
-./build_lib.sh -t release -i -D CMAKE_INSTALL_PREFIX=/opt/my_project
-# or install a static library package:
+./build_lib.sh -t release -i -D CMAKE_INSTALL_PREFIX=/opt/xbox-controller-api
 ./build_lib.sh -t release -i -D BUILD_SHARED_LIBS=OFF
 ```
 
-In a downstream CMake project:
+An installed consumer finds and links the exported target as follows:
 
 ```cmake
-# Option 1: set the path explicitly
-set(my_project_DIR "/path/to/install/lib/cmake/my_project")
-find_package(my_project REQUIRED)
-
-# Option 2: via CMAKE_PREFIX_PATH
-cmake -DCMAKE_PREFIX_PATH=/path/to/install ...
+find_package(xbox_controller_api CONFIG REQUIRED)
+target_link_libraries(controller_app PRIVATE xbox_controller_api::xbox_controller_api)
 ```
 
-Then link:
+Point CMake at the install prefix when it is not already discoverable:
+
+```bash
+cmake -S . -B build_consumer \
+  -DCMAKE_PREFIX_PATH=/opt/xbox-controller-api
+```
+
+For the default prefix in this checkout, use `-DCMAKE_PREFIX_PATH="$PWD/install"`.
+The installed target provides the include directories and link dependencies;
+do not add the library's `src/` directory manually.
+
+A parent project can also build the core directly from a source checkout:
 
 ```cmake
-target_link_libraries(my_target PRIVATE my_project::my_project)
+add_subdirectory(external/xbox-controller-api)
+target_link_libraries(controller_app PRIVATE xbox_controller_api::xbox_controller_api)
 ```
 
-See [`examples/consumer_project/`](examples/consumer_project/) for a complete working example.
+The source-tree form builds only the core library as part of the parent. Use a
+standalone build for the supplied programs, examples, tests, Python wrapper,
+and ROS 2 overlay.
+
+[`examples/consumer_project/`](examples/consumer_project/) contains a complete
+installed-package example that exercises the hardware-free scripted source.
 
 ---
 

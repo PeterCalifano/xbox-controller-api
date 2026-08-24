@@ -1,4 +1,8 @@
 /**:
   ros__parameters:
-    gain: 2.0
-    bias: 1.0
+    # Negative selects the lowest-numbered game controller SDL recognizes.
+    joystick_index: -1
+    publish_rate_hz: 50.0
+    # Pass-through by default; raise to roughly 0.10-0.20 to suppress drift.
+    stick_deadzone: 0.0
+    frame_id: xbox_controller

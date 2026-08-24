@@ -1,6 +1,9 @@
 set(lib_name ${LIB_TARGET_NAME}) # Override lets nested consumers avoid target name collisions.
 
 # Add config.h file to build
+# Mirror the resolved SDL2 outcome, not the request flag, so the generated
+# header always describes the build that was actually produced.
+set(XBOX_CONTROLLER_API_HAS_SDL2 ${SDL2_ENABLED})
 configure_file(config.h.in config.h)
 
 # Add src files to library
@@ -59,6 +62,15 @@ set_target_properties(${lib_name} PROPERTIES EXPORT_NAME ${project_name})
 message(STATUS "Configured ${lib_name} as a ${lib_target_type} library target")
 set(PROJECT_LIBRARY_KIND "${lib_target_type}" PARENT_SCOPE)
 
+# Preserve the configure-time reason so the no-backend stub reports the actual
+# disabled or unavailable dependency state at runtime.
+if(NOT SDL2_ENABLED)
+  target_compile_definitions(
+    ${lib_name}
+    PRIVATE XBOX_CONTROLLER_API_SDL2_UNAVAILABLE_REASON="${SDL2_UNAVAILABLE_REASON}"
+  )
+endif()
+
 # Add alias target for consumer usage
 if(NOT TARGET ${LIB_NAMESPACE}::${project_name})
   add_library(${LIB_NAMESPACE}::${project_name} ALIAS ${lib_name})
@@ -78,6 +90,10 @@ target_link_libraries(${lib_name} ${lib_link_scope} ${project_name}_include ${LI
 
 if (ENABLE_OPENGL)
   target_link_libraries(${lib_name} ${lib_link_scope} ${OPENGL_COMPILE_TARGET})
+endif()
+
+if (SDL2_ENABLED)
+  target_link_libraries(${lib_name} ${lib_link_scope} ${SDL2_COMPILE_TARGET})
 endif()
 
 # Link profiling interface: profiling flags and gperftools/tcmalloc are opt-in.
@@ -113,6 +129,10 @@ endif()
                       
 if (ENABLE_OPENGL)
   list(APPEND installable_targets ${OPENGL_COMPILE_TARGET})
+endif()
+
+if (SDL2_ENABLED)
+  list(APPEND installable_targets ${SDL2_COMPILE_TARGET})
 endif()
 
 message(NOTICE "Added target to installable list: ${installable_targets}")
