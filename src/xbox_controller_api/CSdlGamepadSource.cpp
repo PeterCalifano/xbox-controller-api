@@ -23,9 +23,11 @@ namespace xbox_controller_api
 {
     namespace
     {
+#ifndef __SDL2_ENABLED__
         /// @brief Diagnostic reported when this build has no SDL2 backend.
         constexpr const char *charBackendUnavailableMessage =
-            "SDL2 backend is not compiled into this build (ENABLE_SDL2 was OFF at configure time)";
+            XBOX_CONTROLLER_API_SDL2_UNAVAILABLE_REASON;
+#endif
 
         /// @brief Read the steady clock in nanoseconds for snapshot timestamps.
         [[nodiscard]] std::uint64_t ReadSteadyClockNs() noexcept
@@ -161,9 +163,6 @@ namespace xbox_controller_api
 
         /// True while this instance holds one SDL_InitSubSystem reference.
         bool bHoldsSubsystemRef_ = false;
-
-        /// True when this instance started the subsystem.
-        bool bStartedSubsystem_ = false;
 #endif
     };
 
@@ -228,7 +227,6 @@ namespace xbox_controller_api
         }
 
         pImpl_->bHoldsSubsystemRef_ = true;
-        pImpl_->bStartedSubsystem_ = bIsFirstInitializer_;
 
         // Refresh the device list without draining the event queue.
         SDL_GameControllerUpdate();
@@ -261,13 +259,6 @@ namespace xbox_controller_api
         const char *charDeviceName_ = SDL_GameControllerName(pGameController_);
         pImpl_->charDeviceName_ = (charDeviceName_ != nullptr) ? charDeviceName_ : "Unknown controller";
 
-        // Discard device-added events only when this instance owns the queue.
-        if (pImpl_->bStartedSubsystem_)
-        {
-            SDL_FlushEvent(SDL_JOYDEVICEADDED);
-            SDL_FlushEvent(SDL_CONTROLLERDEVICEADDED);
-        }
-
         // Publish the initial controller state.
         setState(ReadControllerState(*pGameController_, state().ui64SequenceId_ + 1U,
                                      ReadSteadyClockNs()));
@@ -294,8 +285,6 @@ namespace xbox_controller_api
             SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
             pImpl_->bHoldsSubsystemRef_ = false;
         }
-
-        pImpl_->bStartedSubsystem_ = false;
 #endif
 
         pImpl_->charDeviceName_.clear();
@@ -319,12 +308,6 @@ namespace xbox_controller_api
 
         // Refresh state without consuming the host application's event queue.
         SDL_GameControllerUpdate();
-
-        // Prevent a privately owned event queue from accumulating poll events.
-        if (pImpl_->bStartedSubsystem_)
-        {
-            SDL_FlushEvents(SDL_JOYAXISMOTION, SDL_CONTROLLERSENSORUPDATE);
-        }
 
         // Publish and log the disconnect once; reopening is caller-controlled.
         if (SDL_GameControllerGetAttached(pImpl_->pGameController_) != SDL_TRUE)

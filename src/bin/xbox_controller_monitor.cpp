@@ -155,17 +155,19 @@ int main()
     CLogger objLogger_("xbox_controller_monitor", ELogLevel::Info);
     objLogger_.setLevelFromEnvironment();
 
+    CSdlGamepadSource objSource_;
+
     if (!CSdlGamepadSource::isBackendAvailable())
     {
-        objLogger_.info("SDL2 backend is not compiled into this build; "
-                        "reconfigure with -DENABLE_SDL2=ON to enable it.");
+        // Ask the source for the configure-time reason so a missing dependency
+        // is not misreported as an explicitly disabled backend.
+        (void)objSource_.open();
+        objLogger_.info("SDL2 backend is unavailable: ", objSource_.lastError());
 
         return 0;
     }
 
     objLogger_.info("SDL2 backend is available; attempting to attach.");
-
-    CSdlGamepadSource objSource_;
 
     if (!objSource_.open())
     {

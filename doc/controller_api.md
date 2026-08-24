@@ -204,7 +204,8 @@ When an application also owns SDL:
 - `SDL_InitSubSystem` is reference counted, and the source releases exactly the
   reference it took.
 - Hints are set only when the source initializes SDL first.
-- Device-added events are flushed only when the source started the subsystem.
+- Device and controller events remain available to the application's event
+  loop regardless of which component initialized SDL first.
 
 One source instance must be used from a single thread. SDL's game controller
 subsystem does not support concurrent access to one device.

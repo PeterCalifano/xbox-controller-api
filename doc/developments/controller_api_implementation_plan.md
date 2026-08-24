@@ -52,8 +52,9 @@ Controller → SDL2 GameController → CSdlGamepadSource → SGamepadState
 
 ## Implementation notes
 
-- The SDL2 fallback links resolved pkg-config flags instead of exporting a
-  `PkgConfig::` target, which would not exist in an installed consumer.
+- The SDL2 fallback links `PkgConfig::SDL2_PC`; the installed package recreates
+  that imported target from the consumer's pkg-config metadata before loading
+  the exported project targets.
 - `SDL2_ENABLED` records the resolved backend state. `ENABLE_SDL2` remains the
   configuration request.
 - `GamepadControls` is the single source of truth for button names, snapshot

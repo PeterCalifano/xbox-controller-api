@@ -29,14 +29,20 @@ function(handle_sdl2)
 
     set(SDL2_ENABLED OFF PARENT_SCOPE)
     set(SDL2_FOUND_VIA_CONFIG OFF PARENT_SCOPE)
+    set(SDL2_FOUND_VIA_PKG_CONFIG OFF PARENT_SCOPE)
     set(SDL2_RESOLVED_VERSION "" PARENT_SCOPE)
+    set(SDL2_UNAVAILABLE_REASON "" PARENT_SCOPE)
 
     if(NOT ENABLE_SDL2)
+        set(SDL2_UNAVAILABLE_REASON
+            "SDL2 backend disabled by configuration (ENABLE_SDL2=OFF)."
+            PARENT_SCOPE)
         message(STATUS "SDL2 gamepad backend disabled by configuration (ENABLE_SDL2=OFF).")
         return()
     endif()
 
     set(_bFoundViaConfig OFF)
+    set(_bFoundViaPkgConfig OFF)
     set(_charResolvedVersion "")
     set(_charUnavailableReason "")
 
@@ -61,14 +67,11 @@ function(handle_sdl2)
                 set(_charUnavailableReason
                     "ENABLE_SDL2 is ON but SDL2 was found through neither its CMake package nor pkg-config.")
             else()
-                # Export resolved flags: PkgConfig imported targets are local to
-                # this configure and cannot be used by installed consumers.
-                target_link_libraries(${HSDL_TARGET} INTERFACE ${SDL2_PC_LINK_LIBRARIES})
+                # The installed package recreates this imported target from the
+                # consumer's pkg-config metadata before loading our export.
+                target_link_libraries(${HSDL_TARGET} INTERFACE PkgConfig::SDL2_PC)
 
-                if(SDL2_PC_INCLUDE_DIRS)
-                    target_include_directories(${HSDL_TARGET} INTERFACE ${SDL2_PC_INCLUDE_DIRS})
-                endif()
-
+                set(_bFoundViaPkgConfig ON)
                 set(_charResolvedVersion "${SDL2_PC_VERSION}")
             endif()
         endif()
@@ -81,6 +84,7 @@ function(handle_sdl2)
         endif()
 
         message(WARNING "${_charUnavailableReason} The SDL2 gamepad backend will be disabled.")
+        set(SDL2_UNAVAILABLE_REASON "${_charUnavailableReason}" PARENT_SCOPE)
         return()
     endif()
 
@@ -88,6 +92,7 @@ function(handle_sdl2)
 
     set(SDL2_ENABLED ON PARENT_SCOPE)
     set(SDL2_FOUND_VIA_CONFIG ${_bFoundViaConfig} PARENT_SCOPE)
+    set(SDL2_FOUND_VIA_PKG_CONFIG ${_bFoundViaPkgConfig} PARENT_SCOPE)
     set(SDL2_RESOLVED_VERSION "${_charResolvedVersion}" PARENT_SCOPE)
 
     if(_bFoundViaConfig)

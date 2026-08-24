@@ -14,10 +14,61 @@
 #include <xbox_controller_api/CSdlGamepadSource.h>
 #include <xbox_controller_api/SGamepadState.h>
 
+#ifdef __SDL2_ENABLED__
+#include <SDL.h>
+#endif
+
 #include <cstdint>
 
 using Catch::Matchers::WithinAbs;
 using xbox_controller_api::CSdlGamepadSource;
+
+#ifdef __SDL2_ENABLED__
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+namespace
+{
+    /// @brief Own SDL test state so failing assertions still release it.
+    struct SSdlVirtualControllerGuard
+    {
+        int i32DeviceIndex_ = -1;
+        bool bHoldsJoystickSubsystemRef_ = false;
+
+        ~SSdlVirtualControllerGuard()
+        {
+            if (i32DeviceIndex_ >= 0)
+            {
+                (void)SDL_JoystickDetachVirtual(i32DeviceIndex_);
+            }
+            if (bHoldsJoystickSubsystemRef_)
+            {
+                SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+            }
+        }
+    };
+
+    /// @brief Attach a GameController-shaped virtual joystick for queue tests.
+    [[nodiscard]] int AttachVirtualGameController()
+    {
+#if SDL_VERSION_ATLEAST(2, 24, 0)
+        SDL_VirtualJoystickDesc strDescriptor_{};
+        strDescriptor_.version = SDL_VIRTUAL_JOYSTICK_DESC_VERSION;
+        strDescriptor_.type = SDL_JOYSTICK_TYPE_GAMECONTROLLER;
+        strDescriptor_.naxes = static_cast<Uint16>(SDL_CONTROLLER_AXIS_MAX);
+        strDescriptor_.nbuttons = static_cast<Uint16>(SDL_CONTROLLER_BUTTON_MAX);
+        strDescriptor_.axis_mask = (1U << SDL_CONTROLLER_AXIS_MAX) - 1U;
+        strDescriptor_.button_mask = (1U << SDL_CONTROLLER_BUTTON_MAX) - 1U;
+        strDescriptor_.name = "xbox_controller_api event queue test";
+
+        return SDL_JoystickAttachVirtualEx(&strDescriptor_);
+#else
+        return SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER,
+                                         SDL_CONTROLLER_AXIS_MAX,
+                                         SDL_CONTROLLER_BUTTON_MAX, 0);
+#endif
+    }
+} // namespace
+#endif
+#endif
 
 TEST_CASE("a fresh SDL source touches no device", "[source][sdl]")
 {
@@ -162,3 +213,42 @@ TEST_CASE("repeated polling advances the sequence and stays in range", "[source]
         REQUIRE(strState_.dRightTrigger_ <= 1.0);
     }
 }
+
+#ifdef __SDL2_ENABLED__
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+TEST_CASE("polling preserves the host SDL event queue", "[source][sdl][events]")
+{
+    // Initialize only the joystick dependency so the source remains the first
+    // owner of the game-controller subsystem, which is the regression path.
+    REQUIRE(SDL_WasInit(SDL_INIT_GAMECONTROLLER) == 0U);
+
+    SSdlVirtualControllerGuard strGuard_;
+    REQUIRE(SDL_InitSubSystem(SDL_INIT_JOYSTICK) == 0);
+    strGuard_.bHoldsJoystickSubsystemRef_ = true;
+
+    strGuard_.i32DeviceIndex_ = AttachVirtualGameController();
+    REQUIRE(strGuard_.i32DeviceIndex_ >= 0);
+
+    // Queue one identifiable host event before the source initializes and
+    // polls the controller. Neither operation may remove it.
+    SDL_FlushEvent(SDL_JOYAXISMOTION);
+    SDL_Event objPendingEvent_{};
+    objPendingEvent_.type = SDL_JOYAXISMOTION;
+    objPendingEvent_.jaxis.which = 0x1234;
+    objPendingEvent_.jaxis.axis = 2;
+    objPendingEvent_.jaxis.value = 12345;
+    REQUIRE(SDL_PushEvent(&objPendingEvent_) == 1);
+
+    CSdlGamepadSource objSource_;
+    REQUIRE(objSource_.open(strGuard_.i32DeviceIndex_));
+    REQUIRE(objSource_.update());
+
+    SDL_Event objObservedEvent_{};
+    REQUIRE(SDL_PeepEvents(&objObservedEvent_, 1, SDL_GETEVENT,
+                           SDL_JOYAXISMOTION, SDL_JOYAXISMOTION) == 1);
+    REQUIRE(objObservedEvent_.jaxis.which == objPendingEvent_.jaxis.which);
+    REQUIRE(objObservedEvent_.jaxis.axis == objPendingEvent_.jaxis.axis);
+    REQUIRE(objObservedEvent_.jaxis.value == objPendingEvent_.jaxis.value);
+}
+#endif
+#endif

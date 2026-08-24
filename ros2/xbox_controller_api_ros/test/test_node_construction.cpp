@@ -22,11 +22,12 @@ void EnsureRosInitialized() {
 
 rclcpp::NodeOptions MakeOptions(
     double dPublishRateHz,
-    std::int32_t i32JoystickIndex = -1) {
+    std::int64_t i64JoystickIndex = -1,
+    double dStickDeadzone = 0.15) {
   rclcpp::NodeOptions objOptions_;
-  objOptions_.append_parameter_override("joystick_index", i32JoystickIndex);
+  objOptions_.append_parameter_override("joystick_index", i64JoystickIndex);
   objOptions_.append_parameter_override("publish_rate_hz", dPublishRateHz);
-  objOptions_.append_parameter_override("stick_deadzone", 0.15);
+  objOptions_.append_parameter_override("stick_deadzone", dStickDeadzone);
   objOptions_.append_parameter_override("frame_id", std::string("test_pad"));
 
   return objOptions_;
@@ -52,6 +53,28 @@ TEST(XboxControllerLifecycleNode, AnUnusablePublishRateFailsConfiguration) {
       MakeOptions(0.0));
 
   // Invalid rates fail configuration instead of being clamped.
+  EXPECT_EQ(objNode_->configure().label(), "unconfigured");
+}
+
+TEST(XboxControllerLifecycleNode, ANonFiniteDeadzoneFailsConfiguration) {
+  EnsureRosInitialized();
+
+  auto objNode_ = std::make_shared<xbox_controller_api_ros::CXboxControllerLifecycleNode>(
+      MakeOptions(50.0, -1, std::numeric_limits<double>::quiet_NaN()));
+
+  // Invalid conditioning must fail before a publisher can emit NaN axes.
+  EXPECT_EQ(objNode_->configure().label(), "unconfigured");
+}
+
+TEST(XboxControllerLifecycleNode, AnOutOfRangeJoystickIndexFailsConfiguration) {
+  EnsureRosInitialized();
+
+  constexpr std::int64_t i64OutOfRangeIndex_ =
+      static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max()) + 1;
+  auto objNode_ = std::make_shared<xbox_controller_api_ros::CXboxControllerLifecycleNode>(
+      MakeOptions(50.0, i64OutOfRangeIndex_));
+
+  // Reject the ROS int64 value instead of narrowing it into the default policy.
   EXPECT_EQ(objNode_->configure().label(), "unconfigured");
 }
 

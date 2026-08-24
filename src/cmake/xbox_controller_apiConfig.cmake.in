@@ -9,4 +9,11 @@ foreach(dep ${_DEPENDENCIES})
   find_dependency(${dep})
 endforeach()
 
+# Recreate the pkg-config target in the consumer's environment before the
+# exported SDL interface refers to it.
+if(@SDL2_FOUND_VIA_PKG_CONFIG@)
+  find_dependency(PkgConfig)
+  pkg_check_modules(SDL2_PC REQUIRED IMPORTED_TARGET sdl2)
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Target.cmake")

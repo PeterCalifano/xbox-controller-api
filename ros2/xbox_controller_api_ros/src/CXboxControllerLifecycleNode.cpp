@@ -10,6 +10,8 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdint>
+#include <limits>
 
 namespace xbox_controller_api_ros {
 
@@ -37,16 +39,31 @@ CXboxControllerLifecycleNode::CXboxControllerLifecycleNode(const rclcpp::NodeOpt
 }
 
 CallbackReturn CXboxControllerLifecycleNode::on_configure(const rclcpp_lifecycle::State&) {
-  i32JoystickIndex_ = static_cast<std::int32_t>(get_parameter("joystick_index").as_int());
+  const std::int64_t i64JoystickIndex_ = get_parameter("joystick_index").as_int();
   dPublishRateHz_ = get_parameter("publish_rate_hz").as_double();
   dStickDeadzone_ = get_parameter("stick_deadzone").as_double();
   charFrameId_ = get_parameter("frame_id").as_string();
+
+  if (i64JoystickIndex_ < std::numeric_limits<std::int32_t>::min() ||
+      i64JoystickIndex_ > std::numeric_limits<std::int32_t>::max()) {
+    RCLCPP_ERROR(
+        get_logger(),
+        "joystick_index must fit in a signed 32-bit integer; got %lld",
+        static_cast<long long>(i64JoystickIndex_));
+    return CallbackReturn::FAILURE;
+  }
+  i32JoystickIndex_ = static_cast<std::int32_t>(i64JoystickIndex_);
 
   if (!(dPublishRateHz_ >= kMinimumPublishRateHz) || !(dPublishRateHz_ <= kMaximumPublishRateHz)) {
     RCLCPP_ERROR(
         get_logger(),
         "publish_rate_hz must lie in [%.1f, %.1f]; got %f",
         kMinimumPublishRateHz, kMaximumPublishRateHz, dPublishRateHz_);
+    return CallbackReturn::FAILURE;
+  }
+
+  if (!std::isfinite(dStickDeadzone_)) {
+    RCLCPP_ERROR(get_logger(), "stick_deadzone must be finite; got %f", dStickDeadzone_);
     return CallbackReturn::FAILURE;
   }
 

@@ -62,6 +62,15 @@ set_target_properties(${lib_name} PROPERTIES EXPORT_NAME ${project_name})
 message(STATUS "Configured ${lib_name} as a ${lib_target_type} library target")
 set(PROJECT_LIBRARY_KIND "${lib_target_type}" PARENT_SCOPE)
 
+# Preserve the configure-time reason so the no-backend stub reports the actual
+# disabled or unavailable dependency state at runtime.
+if(NOT SDL2_ENABLED)
+  target_compile_definitions(
+    ${lib_name}
+    PRIVATE XBOX_CONTROLLER_API_SDL2_UNAVAILABLE_REASON="${SDL2_UNAVAILABLE_REASON}"
+  )
+endif()
+
 # Add alias target for consumer usage
 if(NOT TARGET ${LIB_NAMESPACE}::${project_name})
   add_library(${LIB_NAMESPACE}::${project_name} ALIAS ${lib_name})
