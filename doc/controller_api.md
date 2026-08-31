@@ -188,7 +188,18 @@ When a controller is unplugged:
 - `state()` then reports every axis at rest and `bConnected_` false.
 - Subsequent `update()` calls keep returning false without republishing.
 
-Call `open()` to reconnect. The library does not retry automatically.
+Call `open()` to reconnect. The library does not retry a detached controller
+automatically.
+
+On Linux, the initial `open()` does recover automatically from a common access
+failure when this source initializes SDL's joystick subsystem: if evdev
+enumeration reports no devices and no explicit `SDL_JOYSTICK_DEVICE` is set,
+the source retries through the lowest-numbered readable `/dev/input/js*` node.
+This does not alter permissions, retain a process-wide SDL device hint, or
+install udev rules. If another component initializes SDL first, set the device
+hint before that initialization.
+
+Set `XBOX_CONTROLLER_API_DISABLE_LEGACY_FALLBACK=1` to disable that fallback.
 
 `close()` is safe to call at any time, is idempotent, and publishes the same
 neutral snapshot when a device was attached.

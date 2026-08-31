@@ -11,9 +11,18 @@
 #include <xbox_controller_api/GamepadFilters.h>
 #include <xbox_controller_api/SGamepadState.h>
 
+#include <charconv>
 #include <chrono>
+#include <cstdlib>
+#include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
+
+#if defined(__linux__)
+#include <unistd.h>
+#endif
 
 #ifdef __SDL2_ENABLED__
 #include <SDL.h>
@@ -62,38 +71,191 @@ namespace xbox_controller_api
             return SDL_GameControllerGetButton(&objController, enumButton) != 0;
         }
 
+        /// @brief Selected joystick index and the reason selection failed.
+        struct SIndexResolution
+        {
+            std::int32_t i32Index_ = -1;
+            std::string charDiagnostic_;
+            bool bNoDevicesVisible_ = false;
+        };
+
+#if defined(__linux__)
+        /// @brief Whether automatic legacy-device fallback is enabled.
+        [[nodiscard]] bool IsLegacyFallbackEnabled()
+        {
+            const char *charDisabled_ = std::getenv(
+                "XBOX_CONTROLLER_API_DISABLE_LEGACY_FALLBACK");
+            if (charDisabled_ == nullptr)
+            {
+                return true;
+            }
+
+            const std::string_view charDisabledValue_(charDisabled_);
+            return charDisabledValue_ != "1" && charDisabledValue_ != "true";
+        }
+
+        /// @brief Parse the numeric suffix from a Linux js* device name.
+        [[nodiscard]] std::optional<std::uint32_t> ParseLegacyJoystickIndex(
+            const std::string_view charName)
+        {
+            constexpr std::string_view charPrefix_ = "js";
+            if (!charName.starts_with(charPrefix_) || charName.size() == charPrefix_.size())
+            {
+                return std::nullopt;
+            }
+
+            std::uint32_t ui32Index_ = 0;
+            const char *charBegin_ = charName.data() + charPrefix_.size();
+            const char *charEnd_ = charName.data() + charName.size();
+            const auto [charParsedEnd_, objError_] =
+                std::from_chars(charBegin_, charEnd_, ui32Index_);
+
+            if (objError_ != std::errc{} || charParsedEnd_ != charEnd_)
+            {
+                return std::nullopt;
+            }
+
+            return ui32Index_;
+        }
+
+        /// @brief Find the lowest-numbered readable legacy joystick device node.
+        [[nodiscard]] std::optional<std::string> FindReadableLegacyJoystick()
+        {
+            const std::filesystem::path objInputRoot_("/dev/input");
+            std::error_code objError_;
+
+            if (!std::filesystem::is_directory(objInputRoot_, objError_))
+            {
+                return std::nullopt;
+            }
+
+            // Select in one pass so discovery uses constant extra memory while
+            // retaining the natural js0, js1, ... device ordering.
+            std::optional<std::uint32_t> ui32SelectedIndex_;
+            std::filesystem::path objSelectedPath_;
+            std::filesystem::directory_iterator objIterator_(objInputRoot_, objError_);
+            const std::filesystem::directory_iterator objEnd_;
+
+            while (!objError_ && objIterator_ != objEnd_)
+            {
+                const std::filesystem::path objCandidatePath_ = objIterator_->path();
+                const std::optional<std::uint32_t> ui32CandidateIndex_ =
+                    ParseLegacyJoystickIndex(objCandidatePath_.filename().string());
+
+                if (ui32CandidateIndex_ &&
+                    (!ui32SelectedIndex_ || *ui32CandidateIndex_ < *ui32SelectedIndex_) &&
+                    ::access(objCandidatePath_.c_str(), R_OK) == 0)
+                {
+                    ui32SelectedIndex_ = ui32CandidateIndex_;
+                    objSelectedPath_ = objCandidatePath_;
+                }
+
+                objIterator_.increment(objError_);
+            }
+
+            if (objError_ || !ui32SelectedIndex_)
+            {
+                return std::nullopt;
+            }
+
+            return objSelectedPath_.string();
+        }
+#endif
+
+        /// @brief Name one joystick index as SDL reports it, never returning null.
+        [[nodiscard]] std::string DescribeJoystick(std::int32_t i32Index)
+        {
+            const char *charName_ = SDL_JoystickNameForIndex(i32Index);
+
+            return std::string("'") + ((charName_ != nullptr) ? charName_ : "unnamed device") + "'";
+        }
+
+        /// @brief List every joystick SDL can see, for inclusion in a diagnostic.
+        [[nodiscard]] std::string DescribeVisibleJoysticks(std::int32_t i32DeviceCount)
+        {
+            std::string charDescription_;
+
+            for (std::int32_t i32Index_ = 0; i32Index_ < i32DeviceCount; ++i32Index_)
+            {
+                if (!charDescription_.empty())
+                {
+                    charDescription_ += ", ";
+                }
+
+                charDescription_ += DescribeJoystick(i32Index_);
+            }
+
+            return charDescription_;
+        }
+
         /**
          * @brief Select which joystick index to attach to.
          *
          * @param i32RequestedIndex Caller request, negative to apply the default
          *        policy.
-         * @return A usable game controller index, or -1 when none qualifies.
+         * @return The chosen index, or a negative index plus the reason no
+         *         device qualified.
          */
-        [[nodiscard]] std::int32_t ResolveGameControllerIndex(std::int32_t i32RequestedIndex) noexcept
+        [[nodiscard]] SIndexResolution ResolveGameControllerIndex(std::int32_t i32RequestedIndex)
         {
             const std::int32_t i32DeviceCount_ = SDL_NumJoysticks();
 
-            // Select the first SDL game controller when no index was requested.
+            if (i32DeviceCount_ < 0)
+            {
+                return {-1,
+                        std::string("SDL_NumJoysticks failed: ") + SDL_GetError(),
+                        false};
+            }
+
+            // An empty evdev list can be a permissions issue even when the
+            // narrower legacy device node remains readable.
+            if (i32DeviceCount_ == 0)
+            {
+                return {-1,
+                        "SDL reports no input devices (SDL_NumJoysticks() == 0). SDL enumerates "
+                        "through evdev: check /dev/input/event* is readable by this user",
+                        true};
+            }
+
+            // No index requested: take the first device carrying a mapping.
             if (i32RequestedIndex < 0)
             {
                 for (std::int32_t i32Index_ = 0; i32Index_ < i32DeviceCount_; ++i32Index_)
                 {
                     if (SDL_IsGameController(i32Index_) == SDL_TRUE)
                     {
-                        return i32Index_;
+                        return {i32Index_, {}, false};
                     }
                 }
 
-                return -1;
+                return {-1,
+                        "SDL reports " + std::to_string(i32DeviceCount_) +
+                            " device(s), none with a game controller mapping: " +
+                            DescribeVisibleJoysticks(i32DeviceCount_) +
+                            ". Set SDL_GAMECONTROLLERCONFIG to add one",
+                        false};
             }
 
-            if (i32RequestedIndex >= i32DeviceCount_ ||
-                SDL_IsGameController(i32RequestedIndex) != SDL_TRUE)
+            if (i32RequestedIndex >= i32DeviceCount_)
             {
-                return -1;
+                return {-1,
+                        "Joystick index " + std::to_string(i32RequestedIndex) +
+                            " is out of range: SDL reports " + std::to_string(i32DeviceCount_) +
+                            " device(s): " + DescribeVisibleJoysticks(i32DeviceCount_),
+                        false};
             }
 
-            return i32RequestedIndex;
+            if (SDL_IsGameController(i32RequestedIndex) != SDL_TRUE)
+            {
+                return {-1,
+                        "Joystick index " + std::to_string(i32RequestedIndex) + " (" +
+                            DescribeJoystick(i32RequestedIndex) +
+                            ") has no game controller mapping. Set SDL_GAMECONTROLLERCONFIG, or "
+                            "request no index to take the first mapped device",
+                        false};
+            }
+
+            return {i32RequestedIndex, {}, false};
         }
 
         /**
@@ -211,9 +373,11 @@ namespace xbox_controller_api
         return false;
 #else
         // Set hints only when this instance initializes the subsystem first.
-        const bool bIsFirstInitializer_ = (SDL_WasInit(SDL_INIT_GAMECONTROLLER) == 0U);
+        const bool bIsFirstJoystickInitializer_ = (SDL_WasInit(SDL_INIT_JOYSTICK) == 0U);
+        const bool bIsFirstControllerInitializer_ =
+            (SDL_WasInit(SDL_INIT_GAMECONTROLLER) == 0U);
 
-        if (bIsFirstInitializer_)
+        if (bIsFirstControllerInitializer_)
         {
             SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
         }
@@ -231,18 +395,95 @@ namespace xbox_controller_api
         // Refresh the device list without draining the event queue.
         SDL_GameControllerUpdate();
 
-        const std::int32_t i32ResolvedIndex_ = ResolveGameControllerIndex(i32JoystickIndex);
+        SIndexResolution strResolution_ = ResolveGameControllerIndex(i32JoystickIndex);
 
-        if (i32ResolvedIndex_ < 0)
+#if defined(__linux__)
+        // SDL normally enumerates through evdev. In containers and non-seat
+        // sessions that node is commonly blocked while the device-specific
+        // legacy js* node remains readable. Retry through that narrower node
+        // without changing permissions or installing host udev rules.
+        const bool bShouldTryLegacyFallback_ =
+            strResolution_.bNoDevicesVisible_ && IsLegacyFallbackEnabled() &&
+            SDL_GetHint(SDL_HINT_JOYSTICK_DEVICE) == nullptr;
+
+        if (bShouldTryLegacyFallback_ && !bIsFirstJoystickInitializer_)
         {
-            pImpl_->charLastError_ =
-                "No SDL game controller is available at the requested joystick index";
+            strResolution_.charDiagnostic_ +=
+                ". SDL's joystick subsystem was already initialized; set "
+                "SDL_JOYSTICK_DEVICE before its first initialization";
+        }
+        else if (bShouldTryLegacyFallback_)
+        {
+            const std::optional<std::string> charFallbackDevice_ =
+                FindReadableLegacyJoystick();
+
+            if (charFallbackDevice_)
+            {
+                close();
+
+                // The Linux SDL driver reads this hint during initialization.
+                // Reset it immediately afterwards to avoid changing process
+                // policy for unrelated SDL consumers.
+                if (SDL_SetHint(SDL_HINT_JOYSTICK_DEVICE,
+                                charFallbackDevice_->c_str()) != SDL_TRUE)
+                {
+                    pImpl_->charLastError_ =
+                        "SDL refused the temporary legacy joystick device hint";
+                    pImpl_->objLogger_.error(pImpl_->charLastError_);
+
+                    return false;
+                }
+
+                const std::int32_t i32FallbackInitResult_ =
+                    SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
+                const std::string charFallbackInitError_ = SDL_GetError();
+                SDL_ResetHint(SDL_HINT_JOYSTICK_DEVICE);
+
+                if (i32FallbackInitResult_ != 0)
+                {
+                    pImpl_->charLastError_ =
+                        "SDL fallback initialization failed: " + charFallbackInitError_;
+                    pImpl_->objLogger_.error(pImpl_->charLastError_);
+
+                    return false;
+                }
+
+                pImpl_->bHoldsSubsystemRef_ = true;
+                SDL_GameControllerUpdate();
+                strResolution_ = ResolveGameControllerIndex(i32JoystickIndex);
+
+                if (strResolution_.i32Index_ >= 0)
+                {
+                    pImpl_->objLogger_.warning(
+                        "SDL evdev enumeration found no controllers; using readable legacy device ",
+                        *charFallbackDevice_);
+                }
+                else
+                {
+                    strResolution_.charDiagnostic_ =
+                        "SDL legacy retry through '" + *charFallbackDevice_ +
+                        "' failed: " + strResolution_.charDiagnostic_;
+                }
+            }
+            else
+            {
+                strResolution_.charDiagnostic_ +=
+                    "; no readable /dev/input/jsN fallback device was found";
+            }
+        }
+#endif
+
+        if (strResolution_.i32Index_ < 0)
+        {
+            // Report the specific reason selection failed, not a generic one.
+            pImpl_->charLastError_ = strResolution_.charDiagnostic_;
             pImpl_->objLogger_.error(pImpl_->charLastError_);
             close();
 
             return false;
         }
 
+        const std::int32_t i32ResolvedIndex_ = strResolution_.i32Index_;
         SDL_GameController *pGameController_ = SDL_GameControllerOpen(i32ResolvedIndex_);
 
         if (pGameController_ == nullptr)

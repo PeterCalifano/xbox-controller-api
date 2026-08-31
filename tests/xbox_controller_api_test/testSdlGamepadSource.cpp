@@ -1,11 +1,10 @@
 /**
  * @file testSdlGamepadSource.cpp
  * @brief Invariant checks for the SDL2 backend that hold in every build.
- * @details These cases must pass with the backend compiled in or out, and with
- *          or without a controller attached, so none of them asserts a specific
- *          open() outcome. What they pin down is the relationship between
- *          isBackendAvailable(), open(), lastError(), and the published
- *          snapshot, which is the part a consumer actually reasons about.
+ * @details Portable cases pass with the backend compiled in or out and with or
+ *          without a controller attached. The hardware-tagged fallback case
+ *          skips unless a readable legacy device is available and native SDL
+ *          enumeration cannot already use it.
  */
 
 #include <catch2/catch_test_macros.hpp>
@@ -19,6 +18,14 @@
 #endif
 
 #include <cstdint>
+
+#if defined(__linux__)
+#include <cstdlib>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <unistd.h>
+#endif
 
 using Catch::Matchers::WithinAbs;
 using xbox_controller_api::CSdlGamepadSource;
@@ -68,6 +75,101 @@ namespace
     }
 } // namespace
 #endif
+#endif
+
+#if defined(__linux__) && defined(__SDL2_ENABLED__)
+namespace
+{
+    /// @brief Restore one process environment variable after a test.
+    class CEnvironmentVariableGuard
+    {
+    public:
+        /// @brief Capture the variable so destruction can restore it.
+        explicit CEnvironmentVariableGuard(const char *charName) : charName_(charName)
+        {
+            const char *charValue_ = std::getenv(charName_.c_str());
+            if (charValue_ != nullptr)
+            {
+                charOriginalValue_ = std::string(charValue_);
+            }
+        }
+
+        /// @brief Restore the variable to its value at construction.
+        ~CEnvironmentVariableGuard()
+        {
+            if (charOriginalValue_)
+            {
+                (void)::setenv(charName_.c_str(), charOriginalValue_->c_str(), 1);
+            }
+            else
+            {
+                (void)::unsetenv(charName_.c_str());
+            }
+        }
+
+        CEnvironmentVariableGuard(const CEnvironmentVariableGuard &) = delete;
+        CEnvironmentVariableGuard &operator=(const CEnvironmentVariableGuard &) = delete;
+
+    private:
+        std::string charName_;
+        std::optional<std::string> charOriginalValue_;
+    };
+
+    /// @brief Restore one SDL hint after a test.
+    class CSdlHintGuard
+    {
+    public:
+        /// @brief Capture the hint so destruction can restore it.
+        explicit CSdlHintGuard(const char *charName) : charName_(charName)
+        {
+            const char *charValue_ = SDL_GetHint(charName_.c_str());
+            if (charValue_ != nullptr)
+            {
+                charOriginalValue_ = std::string(charValue_);
+            }
+        }
+
+        /// @brief Restore the hint to its value at construction.
+        ~CSdlHintGuard()
+        {
+            if (charOriginalValue_)
+            {
+                (void)SDL_SetHint(charName_.c_str(), charOriginalValue_->c_str());
+            }
+            else
+            {
+                SDL_ResetHint(charName_.c_str());
+            }
+        }
+
+        CSdlHintGuard(const CSdlHintGuard &) = delete;
+        CSdlHintGuard &operator=(const CSdlHintGuard &) = delete;
+
+    private:
+        std::string charName_;
+        std::optional<std::string> charOriginalValue_;
+    };
+
+    /// @brief Whether this host exposes at least one readable js* node.
+    [[nodiscard]] bool HasReadableLegacyJoystick()
+    {
+        const std::filesystem::path objInputRoot_("/dev/input");
+        std::error_code objError_;
+
+        for (std::filesystem::directory_iterator objIterator_(objInputRoot_, objError_), objEnd_;
+             !objError_ && objIterator_ != objEnd_; objIterator_.increment(objError_))
+        {
+            const std::string charName_ = objIterator_->path().filename().string();
+            if (charName_.starts_with("js") &&
+                ::access(objIterator_->path().c_str(), R_OK) == 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+} // namespace
 #endif
 
 TEST_CASE("a fresh SDL source touches no device", "[source][sdl]")
@@ -146,6 +248,61 @@ TEST_CASE("an out-of-range joystick index never attaches", "[source][sdl]")
     REQUIRE_FALSE(objSource_.connected());
     REQUIRE_FALSE(objSource_.lastError().empty());
 }
+
+#if defined(__linux__) && defined(__SDL2_ENABLED__)
+TEST_CASE("SDL source preserves an explicit joystick device", "[source][sdl][fallback]")
+{
+    CEnvironmentVariableGuard strDeviceGuard_("SDL_JOYSTICK_DEVICE");
+    CEnvironmentVariableGuard strDisableGuard_(
+        "XBOX_CONTROLLER_API_DISABLE_LEGACY_FALLBACK");
+    constexpr const char *charExplicitDevice_ = "/explicit/controller/device";
+
+    REQUIRE(::setenv("SDL_JOYSTICK_DEVICE", charExplicitDevice_, 1) == 0);
+    REQUIRE(::unsetenv("XBOX_CONTROLLER_API_DISABLE_LEGACY_FALLBACK") == 0);
+
+    CSdlGamepadSource objSource_;
+    (void)objSource_.open();
+
+    REQUIRE(std::getenv("SDL_JOYSTICK_DEVICE") != nullptr);
+    REQUIRE(std::string(std::getenv("SDL_JOYSTICK_DEVICE")) == charExplicitDevice_);
+}
+
+TEST_CASE("SDL source retries through a readable legacy joystick",
+          "[.hardware][source][sdl][fallback]")
+{
+    CEnvironmentVariableGuard strDeviceGuard_("SDL_JOYSTICK_DEVICE");
+    CEnvironmentVariableGuard strDisableGuard_(
+        "XBOX_CONTROLLER_API_DISABLE_LEGACY_FALLBACK");
+    REQUIRE(::unsetenv("SDL_JOYSTICK_DEVICE") == 0);
+
+    CSdlHintGuard strDeviceHintGuard_(SDL_HINT_JOYSTICK_DEVICE);
+    SDL_ResetHint(SDL_HINT_JOYSTICK_DEVICE);
+    REQUIRE(SDL_WasInit(SDL_INIT_JOYSTICK) == 0U);
+
+    if (!HasReadableLegacyJoystick())
+    {
+        SKIP("No readable /dev/input/js* node is available for the hardware fallback test");
+    }
+
+    REQUIRE(::setenv("XBOX_CONTROLLER_API_DISABLE_LEGACY_FALLBACK", "1", 1) == 0);
+
+    CSdlGamepadSource objNativeSource_;
+    if (objNativeSource_.open())
+    {
+        SKIP("Native SDL enumeration sees the controller, so fallback is not required");
+    }
+    objNativeSource_.close();
+
+    REQUIRE(::unsetenv("XBOX_CONTROLLER_API_DISABLE_LEGACY_FALLBACK") == 0);
+
+    CSdlGamepadSource objFallbackSource_;
+    REQUIRE(objFallbackSource_.open());
+
+    REQUIRE(objFallbackSource_.connected());
+    REQUIRE_FALSE(objFallbackSource_.deviceName().empty());
+    REQUIRE(SDL_GetHint(SDL_HINT_JOYSTICK_DEVICE) == nullptr);
+}
+#endif
 
 TEST_CASE("closing an attached device publishes the neutral snapshot", "[source][sdl]")
 {

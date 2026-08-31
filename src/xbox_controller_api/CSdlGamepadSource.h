@@ -48,6 +48,11 @@ namespace xbox_controller_api
          * @brief Attach to a controller, initializing SDL2 on first use.
          *
          * Any open controller is released first.
+         * On Linux, when this source initializes SDL's joystick subsystem and
+         * evdev enumeration sees no devices, open() automatically retries
+         * through the lowest-numbered readable /dev/input/js* node. Set
+         * XBOX_CONTROLLER_API_DISABLE_LEGACY_FALLBACK=1 to retain native SDL
+         * enumeration only.
          *
          * @param i32JoystickIndex Joystick index to attach to. The default -1
          *        selects the lowest-numbered SDL game controller.

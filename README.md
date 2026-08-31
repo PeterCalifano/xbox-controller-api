@@ -168,6 +168,24 @@ In a separate terminal, inspect the published messages with:
 ros2 topic echo /xbox_controller/joy
 ```
 
+On Linux, the core source automatically retries through the lowest-numbered
+readable `/dev/input/js*` node when it initializes SDL's joystick subsystem and
+normal evdev enumeration sees no controllers. This covers restricted sessions
+and containers without changing host permissions. Containers must still expose
+`/dev/input`; for example:
+
+```bash
+docker run \
+  --mount type=bind,source=/dev/input,target=/dev/input \
+  --device-cgroup-rule 'c 13:* rwm' \
+  ...
+```
+
+Set `XBOX_CONTROLLER_API_DISABLE_LEGACY_FALLBACK=1` to diagnose native SDL
+enumeration without the fallback. An explicit `SDL_JOYSTICK_DEVICE` remains
+authoritative and is never overwritten. If another component initializes SDL
+first, set that device hint before its initialization.
+
 For a lifecycle manager you control, run the executable directly and request
 the transitions yourself. Parameters must be supplied before configuration:
 
